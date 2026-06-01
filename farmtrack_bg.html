@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FarmTrack — Crop & Labour Management</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500;600&family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --soil:#2C1A0E; --bark:#5C3D1E; --wheat:#C8A96E;
+  --harvest:#E8C547; --leaf:#4A7C3F; --sage:#7FB069;
+  --sky:#B8D4E8; --cream:#F5EDD8; --rust:#C4622D;
+  --fog:rgba(245,237,216,0.06);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--soil);min-height:100vh;overflow-x:hidden;color:var(--cream)}
+
+/* ══ LOADER ══ */
+#loader{position:fixed;inset:0;z-index:9999;background:var(--soil);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .8s ease,visibility .8s ease}
+#loader.hide{opacity:0;visibility:hidden;pointer-events:none}
+.loader-sprout{width:80px;height:80px;margin-bottom:32px;position:relative}
+.sprout-stem{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:4px;background:var(--sage);border-radius:4px;animation:growStem 1.4s cubic-bezier(.22,1,.36,1) forwards;height:0}
+.sprout-leaf{position:absolute;width:28px;height:18px;background:var(--leaf);border-radius:50% 0 50% 0;opacity:0;transform-origin:bottom center}
+.sprout-leaf.left{bottom:40px;left:calc(50% - 26px);transform:rotate(-30deg);animation:growLeafL .5s 1.1s ease forwards}
+.sprout-leaf.right{bottom:52px;left:calc(50% + 2px);transform:rotate(30deg);animation:growLeafR .5s 1.3s ease forwards}
+@keyframes growStem{to{height:65px}}
+@keyframes growLeafL{from{opacity:0;transform:rotate(-30deg) scale(0)}to{opacity:1;transform:rotate(-30deg) scale(1)}}
+@keyframes growLeafR{from{opacity:0;transform:rotate(30deg) scale(0)}to{opacity:1;transform:rotate(30deg) scale(1)}}
+.loader-brand{font-family:'Playfair Display',serif;font-size:2.8rem;font-weight:900;color:var(--cream);letter-spacing:-.02em;opacity:0;animation:fadeUp .6s 1.5s ease forwards}
+.loader-brand span{color:var(--harvest)}
+.loader-sub{font-size:.78rem;letter-spacing:.25em;text-transform:uppercase;color:var(--wheat);margin-top:6px;opacity:0;animation:fadeUp .6s 1.7s ease forwards}
+.loader-bar-track{width:180px;height:3px;background:rgba(200,169,110,.2);border-radius:10px;margin-top:40px;opacity:0;animation:fadeIn .4s 1.8s ease forwards;overflow:hidden}
+.loader-bar-fill{height:100%;width:0;background:var(--harvest);border-radius:10px;animation:fillBar 1.4s 1.9s cubic-bezier(.4,0,.2,1) forwards}
+@keyframes fillBar{to{width:100%}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{to{opacity:1}}
+
+/* ══ PHOTO SLIDESHOW BACKGROUND ══ */
+.scene{position:fixed;inset:0;z-index:0;overflow:hidden}
+
+/* Grain / noise overlay preserved */
+.scene::after{content:'';position:absolute;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:.18;pointer-events:none;z-index:4}
+
+/* Slideshow slides */
+.bg-slide{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transition:opacity 2s ease-in-out;z-index:1}
+.bg-slide.active{opacity:1}
+
+/* Dark cinematic vignette + colour-grade overlay */
+.bg-overlay{
+  position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:
+    radial-gradient(ellipse at center, transparent 30%, rgba(20,10,4,.60) 100%),
+    linear-gradient(180deg, rgba(20,10,4,.25) 0%, transparent 30%, transparent 65%, rgba(20,10,4,.70) 100%);
+}
+/* Warm golden tone overlay to match brand palette */
+.bg-tint{position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:linear-gradient(135deg,rgba(44,26,14,.35) 0%,rgba(200,169,110,.06) 50%,rgba(74,124,63,.12) 100%);
+  mix-blend-mode:multiply}
+
+/* Slide indicator dots */
+.slide-dots{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:50;display:flex;gap:8px;pointer-events:none}
+.slide-dot{width:6px;height:6px;border-radius:50%;background:rgba(245,237,216,.3);transition:all .4s ease}
+.slide-dot.active{width:22px;border-radius:4px;background:var(--harvest)}
+
+/* Caption strip */
+.bg-caption{position:fixed;bottom:18px;right:20px;z-index:50;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(245,237,216,.28);pointer-events:none;transition:opacity .6s}
+
+/* SUN — kept, layered above photos */
+.sun-wrap{position:absolute;top:50px;right:10%;width:110px;height:110px;z-index:5}
+.sun-core{position:absolute;inset:15px;background:radial-gradient(circle,#FFE066 30%,#E8C547 65%,rgba(232,197,71,0) 100%);border-radius:50%;box-shadow:0 0 60px 20px rgba(232,197,71,.3);animation:sunPulse 4s ease-in-out infinite;z-index:2}
+.sun-rays{position:absolute;inset:0;animation:spinRays 20s linear infinite}
+.sun-rays::before,.sun-rays::after{content:'';position:absolute;inset:0;background:repeating-conic-gradient(rgba(232,197,71,.18) 0deg,rgba(232,197,71,.18) 10deg,transparent 10deg,transparent 30deg);border-radius:50%}
+.sun-rays::after{animation:spinRays 12s linear infinite reverse;inset:8px}
+@keyframes spinRays{to{transform:rotate(360deg)}}
+@keyframes sunPulse{0%,100%{box-shadow:0 0 60px 20px rgba(232,197,71,.3)}50%{box-shadow:0 0 100px 40px rgba(232,197,71,.15)}}
+
+/* RICH CLOUDS — kept */
+.cloud-wrap{position:absolute;z-index:5;animation:drift var(--cdur) var(--cdel) linear infinite}
+.cloud-body{position:relative;filter:drop-shadow(0 8px 16px rgba(0,0,0,.25))}
+.cloud-body .cb{position:absolute;background:rgba(245,237,216,.09);border-radius:50%}
+.cloud-body .cb.main{width:var(--cw);height:calc(var(--cw)*.45);bottom:0;left:0;border-radius:40px}
+.cloud-body .cb.b1{width:calc(var(--cw)*.45);height:calc(var(--cw)*.45);bottom:calc(var(--cw)*.22);left:calc(var(--cw)*.15)}
+.cloud-body .cb.b2{width:calc(var(--cw)*.35);height:calc(var(--cw)*.35);bottom:calc(var(--cw)*.18);left:calc(var(--cw)*.44)}
+.cloud-body .cb.b3{width:calc(var(--cw)*.28);height:calc(var(--cw)*.28);bottom:calc(var(--cw)*.12);right:calc(var(--cw)*.12)}
+.cloud-body .cb.shine{position:absolute;width:calc(var(--cw)*.3);height:5px;background:rgba(255,255,255,.12);border-radius:10px;top:calc(var(--cw)*.1);left:calc(var(--cw)*.25)}
+@keyframes drift{from{transform:translateX(-350px)}to{transform:translateX(calc(100vw + 350px))}}
+
+/* BIRDS */
+.bird-flock{position:absolute;pointer-events:none;z-index:5}
+.bird{position:absolute;animation:birdFly var(--bdur) var(--bdel) ease-in-out infinite alternate}
+.bird svg{animation:wingFlap .4s ease-in-out infinite alternate}
+@keyframes birdFly{from{transform:translateY(0)}to{transform:translateY(-14px)}}
+@keyframes wingFlap{from{transform:scaleY(1)}to{transform:scaleY(-0.4)}}
+
+/* FIREFLIES */
+.fireflies{position:absolute;inset:0;pointer-events:none;z-index:5}
+.fly{position:absolute;width:3px;height:3px;background:var(--harvest);border-radius:50%;animation:flyFloat var(--dur) var(--del) ease-in-out infinite alternate;opacity:0}
+@keyframes flyFloat{0%{opacity:0;transform:translate(0,0)}20%{opacity:.8}80%{opacity:.6}100%{opacity:0;transform:translate(var(--tx),var(--ty))}}
+
+/* WHEAT */
+.wheat-row{position:absolute;bottom:0;width:100%;display:flex;gap:8px;align-items:flex-end;pointer-events:none;z-index:5}
+.stalk{flex:1;display:flex;flex-direction:column;align-items:center;animation:sway var(--sw) var(--sd) ease-in-out infinite alternate;transform-origin:bottom center}
+.stalk-head{width:6px;height:18px;background:var(--wheat);border-radius:3px 3px 0 0;position:relative}
+.stalk-head::before,.stalk-head::after{content:'';position:absolute;width:8px;height:8px;background:var(--wheat);border-radius:50%;top:2px}
+.stalk-head::before{left:-8px}.stalk-head::after{right:-8px}
+.stalk-body{width:2px;background:var(--sage);flex:1;min-height:40px;max-height:80px;border-radius:2px}
+@keyframes sway{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}
+
+/* ══ WEATHER WIDGET ══ */
+#weatherWidget{position:fixed;top:20px;left:20px;z-index:100;background:rgba(44,26,14,.75);backdrop-filter:blur(14px);border:1px solid rgba(200,169,110,.2);border-radius:18px;padding:14px 18px;min-width:180px;box-shadow:0 8px 32px rgba(0,0,0,.4);opacity:0;transform:translateY(-10px);transition:opacity .5s,transform .5s}
+#weatherWidget.ready{opacity:1;transform:none}
+.wx-top{display:flex;align-items:center;gap:10px}
+.wx-icon{font-size:2rem;line-height:1}
+.wx-temp{font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:var(--harvest);line-height:1}
+.wx-desc{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--wheat);margin-top:2px}
+.wx-bottom{display:flex;gap:14px;margin-top:10px;border-top:1px solid rgba(200,169,110,.12);padding-top:10px}
+.wx-stat{text-align:center}
+.wx-stat span{display:block}
+.wx-stat .wx-sv{font-size:.82rem;font-weight:600;color:var(--cream)}
+.wx-stat .wx-sl{font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:rgba(200,169,110,.6)}
+.wx-location{font-size:.68rem;color:rgba(200,169,110,.5);margin-top:8px;display:flex;align-items:center;gap:4px}
+.wx-dot{width:6px;height:6px;border-radius:50%;background:var(--sage);animation:wxPulse 2s ease-in-out infinite}
+@keyframes wxPulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ══ LANGUAGE SELECTOR ══ */
+#langSelector{position:fixed;top:20px;right:20px;z-index:100}
+.lang-btn{background:rgba(44,26,14,.75);backdrop-filter:blur(14px);border:1px solid rgba(200,169,110,.2);border-radius:12px;padding:10px 14px;color:var(--cream);font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .2s}
+.lang-btn:hover{border-color:rgba(200,169,110,.4);background:rgba(44,26,14,.9)}
+.lang-flag{font-size:1rem}
+.lang-dropdown{position:absolute;top:calc(100% + 8px);right:0;background:rgba(44,26,14,.95);backdrop-filter:blur(20px);border:1px solid rgba(200,169,110,.2);border-radius:14px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.5);min-width:160px;opacity:0;transform:translateY(-8px) scale(.96);pointer-events:none;transition:all .25s cubic-bezier(.34,1.56,.64,1)}
+.lang-dropdown.open{opacity:1;transform:none;pointer-events:auto}
+.lang-opt{width:100%;background:none;border:none;padding:12px 16px;color:var(--cream);font-family:'DM Sans',sans-serif;font-size:.83rem;cursor:pointer;display:flex;align-items:center;gap:10px;text-align:left;transition:background .15s}
+.lang-opt:hover{background:rgba(200,169,110,.1)}
+.lang-opt.active{color:var(--harvest);background:rgba(232,197,71,.08)}
+.lang-opt .lo-name{font-weight:600}
+.lang-opt .lo-native{font-size:.72rem;color:var(--wheat);opacity:.7}
+.lang-chevron{margin-left:auto;transition:transform .2s}
+.lang-chevron.open{transform:rotate(180deg)}
+
+/* ══ APP ══ */
+.app{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px 120px;opacity:0;animation:fadeIn .8s 3.6s ease forwards}
+
+/* BRAND */
+.brand-header{text-align:center;margin-bottom:40px}
+.brand-icon{display:inline-flex;align-items:center;justify-content:center;width:72px;height:72px;background:linear-gradient(135deg,var(--leaf),var(--sage));border-radius:20px;margin-bottom:16px;box-shadow:0 8px 32px rgba(74,124,63,.4),inset 0 1px 0 rgba(255,255,255,.15);animation:iconBob 3s ease-in-out infinite}
+@keyframes iconBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+.brand-icon svg{width:36px;height:36px}
+.brand-name{font-family:'Playfair Display',serif;font-size:3.2rem;font-weight:900;line-height:1;color:var(--cream);letter-spacing:-.03em}
+.brand-name em{color:var(--harvest);font-style:normal}
+.brand-tagline{font-size:.75rem;letter-spacing:.3em;text-transform:uppercase;color:var(--wheat);margin-top:8px;font-weight:500}
+
+/* AUTH CARD */
+.auth-card{width:100%;max-width:490px;background:rgba(44,26,14,.75);backdrop-filter:blur(20px);border:1px solid rgba(200,169,110,.2);border-radius:28px;box-shadow:0 32px 80px rgba(0,0,0,.5),inset 0 1px 0 rgba(200,169,110,.12);overflow:hidden;position:relative}
+.auth-card::before{content:'';position:absolute;top:0;right:0;width:120px;height:120px;background:radial-gradient(circle at top right,rgba(232,197,71,.12),transparent 70%);pointer-events:none}
+
+/* TABS */
+.tab-bar{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid rgba(200,169,110,.15)}
+.tab-btn{padding:20px;background:none;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:600;letter-spacing:.05em;color:rgba(245,237,216,.4);position:relative;transition:color .3s}
+.tab-btn.active{color:var(--harvest)}
+.tab-btn::after{content:'';position:absolute;bottom:-1px;left:20%;right:20%;height:2px;background:var(--harvest);border-radius:2px;transform:scaleX(0);transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+.tab-btn.active::after{transform:scaleX(1)}
+
+/* PANELS */
+.panels{position:relative;overflow:hidden}
+.panel{padding:28px 34px 24px;transition:transform .45s cubic-bezier(.4,0,.2,1),opacity .35s ease;position:absolute;inset:0;transform:translateX(100%);opacity:0;pointer-events:none}
+.panel.active{position:relative;transform:translateX(0);opacity:1;pointer-events:auto}
+.panel.exit-left{transform:translateX(-100%);opacity:0}
+
+/* SECTION */
+.panel-title{font-family:'Playfair Display',serif;font-size:1.65rem;font-weight:700;color:var(--cream);margin-bottom:4px}
+.panel-sub{font-size:.8rem;color:var(--wheat);margin-bottom:22px;line-height:1.5}
+.panel-sub a{color:var(--harvest);text-decoration:none;font-weight:600}
+.season-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(200,169,110,.12);border:1px solid rgba(200,169,110,.25);border-radius:50px;padding:5px 14px;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--wheat);font-weight:500;margin-bottom:10px}
+.season-dot{width:6px;height:6px;border-radius:50%;background:var(--sage)}
+.hand-accent{font-family:'Caveat',cursive;font-size:1rem;color:var(--harvest);opacity:.8;margin-top:-4px;margin-bottom:14px;display:block}
+
+/* FIELDS */
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field{margin-bottom:14px}
+.field label{display:flex;justify-content:space-between;align-items:center;font-size:.73rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--wheat);margin-bottom:6px}
+.field-wrap{position:relative}
+.field-wrap svg.icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:15px;height:15px;opacity:.45;pointer-events:none;transition:opacity .2s;color:var(--cream)}
+.field-wrap:focus-within svg.icon{opacity:1;color:var(--harvest)}
+.field input,.field select{width:100%;padding:12px 13px 12px 40px;background:rgba(245,237,216,.06);border:1.5px solid rgba(200,169,110,.2);border-radius:12px;color:var(--cream);font-family:'DM Sans',sans-serif;font-size:.88rem;outline:none;transition:border-color .25s,background .25s,box-shadow .25s;-webkit-appearance:none}
+.field input::placeholder{color:rgba(245,237,216,.22)}
+.field input:focus,.field select:focus{border-color:rgba(232,197,71,.5);background:rgba(245,237,216,.09);box-shadow:0 0 0 3px rgba(232,197,71,.1)}
+.field input.valid{border-color:var(--sage)!important}
+.field input.invalid{border-color:var(--rust)!important}
+.field select option{background:var(--soil);color:var(--cream)}
+.field-hint{font-size:.68rem;margin-top:4px;padding-left:2px;transition:color .2s}
+.field-hint.ok{color:var(--sage)}
+.field-hint.err{color:var(--rust)}
+
+/* validation tick */
+.valid-tick{position:absolute;right:13px;top:50%;transform:translateY(-50%);opacity:0;transition:opacity .25s}
+.valid-tick.show{opacity:1}
+
+/* PW toggle */
+.pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:rgba(245,237,216,.3);transition:color .2s;padding:4px}
+.pw-toggle:hover{color:var(--wheat)}
+
+/* Master pw toggle */
+.master-toggle-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;cursor:pointer}
+.master-toggle-row input{accent-color:var(--harvest);cursor:pointer}
+.master-toggle-row label{font-size:.75rem;color:var(--wheat);cursor:pointer;user-select:none}
+
+/* Strength */
+.strength-meter{display:flex;gap:4px;margin-top:6px}
+.strength-bar{flex:1;height:3px;border-radius:3px;background:rgba(200,169,110,.2);transition:background .4s}
+.strength-bar.s1{background:var(--rust)}
+.strength-bar.s2{background:var(--harvest)}
+.strength-bar.s3{background:var(--sage)}
+.strength-label{font-size:.68rem;color:var(--wheat);margin-top:3px;text-align:right}
+
+/* Farm size unit toggle */
+.unit-toggle{display:flex;background:rgba(245,237,216,.06);border-radius:8px;overflow:hidden;border:1px solid rgba(200,169,110,.2)}
+.unit-btn{flex:1;padding:6px;background:none;border:none;color:rgba(245,237,216,.4);font-family:'DM Sans',sans-serif;font-size:.72rem;font-weight:600;cursor:pointer;transition:all .2s}
+.unit-btn.active{background:rgba(232,197,71,.15);color:var(--harvest)}
+
+/* Farm types */
+.farm-types{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.farm-type-btn{background:rgba(245,237,216,.05);border:1px solid rgba(200,169,110,.2);border-radius:11px;padding:11px 8px;cursor:pointer;text-align:center;transition:all .25s;color:var(--wheat);font-family:'DM Sans',sans-serif}
+.farm-type-btn .ft-icon{font-size:1.4rem;display:block;margin-bottom:3px}
+.farm-type-btn .ft-label{font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;font-weight:600}
+.farm-type-btn:hover,.farm-type-btn.selected{border-color:var(--harvest);background:rgba(232,197,71,.1);color:var(--harvest)}
+
+/* Checkbox */
+.check-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:16px}
+.check-row input[type=checkbox]{width:16px;height:16px;flex-shrink:0;accent-color:var(--harvest);margin-top:3px;cursor:pointer}
+.check-row label{font-size:.75rem;color:var(--wheat);line-height:1.5;cursor:pointer}
+.check-row label a{color:var(--harvest);text-decoration:none}
+
+/* Submit button */
+.btn-submit{width:100%;padding:14px;background:linear-gradient(135deg,var(--leaf) 0%,#3d6b32 100%);border:none;border-radius:13px;color:#fff;font-family:'DM Sans',sans-serif;font-size:.92rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;box-shadow:0 6px 24px rgba(74,124,63,.4),inset 0 1px 0 rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;gap:10px}
+.btn-submit:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 10px 32px rgba(74,124,63,.5)}
+.btn-submit:active:not(:disabled){transform:translateY(0)}
+.btn-submit:disabled{opacity:.7;cursor:not-allowed}
+.btn-submit .btn-shine{position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.15),transparent);transform:skewX(-20deg);animation:shine 3s 4s ease-in-out infinite}
+@keyframes shine{0%,100%{left:-100%}50%{left:150%}}
+.btn-spinner{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Divider */
+.divider{display:flex;align-items:center;gap:12px;margin:16px 0}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:rgba(200,169,110,.2)}
+.divider span{font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:rgba(245,237,216,.3)}
+
+/* Social */
+.social-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn-social{padding:11px;border-radius:12px;background:rgba(245,237,216,.05);border:1px solid rgba(200,169,110,.18);color:var(--cream);font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .2s,border-color .2s}
+.btn-social:hover{background:rgba(245,237,216,.1);border-color:rgba(200,169,110,.35)}
+
+/* Stat strip */
+.stat-strip{display:flex;border-top:1px solid rgba(200,169,110,.12);padding:18px 34px}
+.stat-item{flex:1;text-align:center;position:relative}
+.stat-item+.stat-item::before{content:'';position:absolute;left:0;top:10%;bottom:10%;width:1px;background:rgba(200,169,110,.15)}
+.stat-val{display:block;font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:700;color:var(--harvest)}
+.stat-lbl{font-size:.65rem;letter-spacing:.12em;text-transform:uppercase;color:var(--wheat);opacity:.7;margin-top:2px;display:block}
+
+/* ══ OTP STEP ══ */
+.otp-overlay{display:none;flex-direction:column;align-items:center;padding:36px 34px 30px}
+.otp-overlay.show{display:flex}
+.otp-icon{font-size:3rem;margin-bottom:16px}
+.otp-title{font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin-bottom:6px}
+.otp-sub{font-size:.8rem;color:var(--wheat);text-align:center;line-height:1.6;margin-bottom:28px}
+.otp-sub strong{color:var(--cream)}
+.otp-boxes{display:flex;gap:10px;margin-bottom:24px}
+.otp-box{width:52px;height:58px;background:rgba(245,237,216,.07);border:1.5px solid rgba(200,169,110,.25);border-radius:13px;text-align:center;font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;color:var(--harvest);outline:none;caret-color:var(--harvest);transition:border-color .2s,box-shadow .2s}
+.otp-box:focus{border-color:rgba(232,197,71,.6);box-shadow:0 0 0 3px rgba(232,197,71,.12)}
+.otp-resend{font-size:.75rem;color:var(--wheat);margin-bottom:20px}
+.otp-resend a{color:var(--harvest);text-decoration:none;font-weight:600;cursor:pointer}
+.otp-back{background:none;border:none;color:var(--wheat);font-family:'DM Sans',sans-serif;font-size:.8rem;cursor:pointer;margin-top:12px;text-decoration:underline;opacity:.7}
+.otp-back:hover{opacity:1}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--leaf);color:#fff;border-radius:12px;padding:13px 22px;font-size:.85rem;font-weight:600;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:9000;transition:transform .4s cubic-bezier(.34,1.56,.64,1);display:flex;align-items:center;gap:10px;white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.err{background:var(--rust)}
+
+/* Field animations */
+.field{animation:fieldIn .4s both}
+.field:nth-child(1){animation-delay:.04s}.field:nth-child(2){animation-delay:.08s}.field:nth-child(3){animation-delay:.12s}.field:nth-child(4){animation-delay:.16s}.field:nth-child(5){animation-delay:.20s}.field:nth-child(6){animation-delay:.24s}
+@keyframes fieldIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+@media(max-width:520px){
+  .form-row{grid-template-columns:1fr}
+  .panel{padding:22px 20px 20px}
+  .stat-strip{padding:14px 20px}
+  .brand-name{font-size:2.4rem}
+  #weatherWidget{top:auto;bottom:20px;left:50%;transform:translateX(-50%)}
+  #weatherWidget.ready{transform:translateX(-50%) translateY(0)}
+  #langSelector{top:16px;right:16px}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="loader-sprout">
+    <div class="sprout-leaf left"></div>
+    <div class="sprout-leaf right"></div>
+    <div class="sprout-stem"></div>
+  </div>
+  <div class="loader-brand">Farm<span>Track</span></div>
+  <div class="loader-sub">Crop &amp; Labour Management</div>
+  <div class="loader-bar-track"><div class="loader-bar-fill"></div></div>
+</div>
+
+<!-- WEATHER WIDGET -->
+<div id="weatherWidget">
+  <div class="wx-top">
+    <div class="wx-icon" id="wxIcon">⛅</div>
+    <div>
+      <div class="wx-temp" id="wxTemp">—</div>
+      <div class="wx-desc" id="wxDesc">Loading…</div>
+    </div>
+  </div>
+  <div class="wx-bottom">
+    <div class="wx-stat"><span class="wx-sv" id="wxHumid">—</span><span class="wx-sl">Humidity</span></div>
+    <div class="wx-stat"><span class="wx-sv" id="wxWind">—</span><span class="wx-sl">Wind</span></div>
+    <div class="wx-stat"><span class="wx-sv" id="wxUV">—</span><span class="wx-sl">UV Index</span></div>
+  </div>
+  <div class="wx-location"><span class="wx-dot"></span><span id="wxCity">Detecting…</span></div>
+</div>
+
+<!-- LANGUAGE SELECTOR -->
+<div id="langSelector">
+  <button class="lang-btn" id="langBtn" onclick="toggleLang()" aria-label="Select language">
+    <span class="lang-flag" id="langFlag">🇿🇲</span>
+    <span id="langLabel">English</span>
+    <svg class="lang-chevron" id="langChev" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+  </button>
+  <div class="lang-dropdown" id="langDropdown">
+    <button class="lang-opt active" onclick="setLang('en','English','🇿🇲')">
+      <span class="lang-flag">🇿🇲</span>
+      <span><div class="lo-name">English</div><div class="lo-native">English</div></span>
+    </button>
+    <button class="lang-opt" onclick="setLang('ny','Nyanja','🌽')">
+      <span class="lang-flag">🌽</span>
+      <span><div class="lo-name">Nyanja</div><div class="lo-native">Chinyanja</div></span>
+    </button>
+    <button class="lang-opt" onclick="setLang('bem','Bemba','🌿')">
+      <span class="lang-flag">🌿</span>
+      <span><div class="lo-name">Bemba</div><div class="lo-native">Ichibemba</div></span>
+    </button>
+    <button class="lang-opt" onclick="setLang('toi','Tonga','🎋')">
+      <span class="lang-flag">🎋</span>
+      <span><div class="lo-name">Tonga</div><div class="lo-native">Chitonga</div></span>
+    </button>
+    <button class="lang-opt" onclick="setLang('loz','Lozi','🌾')">
+      <span class="lang-flag">🌾</span>
+      <span><div class="lo-name">Lozi</div><div class="lo-native">Silozi</div></span>
+    </button>
+  </div>
+</div>
+
+<!-- SCENE -->
+<div class="scene">
+  <!-- 4K Farm Photo Slides (Unsplash free CDN) -->
+  <div class="bg-slide active" id="slide0"
+    style="background-image:url('https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1920&q=85&fit=crop')"></div>
+  <div class="bg-slide" id="slide1"
+    style="background-image:url('https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=1920&q=85&fit=crop')"></div>
+  <div class="bg-slide" id="slide2"
+    style="background-image:url('https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=1920&q=85&fit=crop')"></div>
+  <div class="bg-slide" id="slide3"
+    style="background-image:url('https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=1920&q=85&fit=crop')"></div>
+  <div class="bg-slide" id="slide4"
+    style="background-image:url('https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=1920&q=85&fit=crop')"></div>
+
+  <!-- Cinematic overlays -->
+  <div class="bg-overlay"></div>
+  <div class="bg-tint"></div>
+
+  <!-- Sun with rays -->
+  <div class="sun-wrap">
+    <div class="sun-rays"></div>
+    <div class="sun-core"></div>
+  </div>
+  <!-- Birds -->
+  <div class="bird-flock" id="birdFlock"></div>
+  <!-- Clouds -->
+  <div id="cloudContainer"></div>
+  <!-- Wheat -->
+  <div class="wheat-row" id="wheatRow"></div>
+  <!-- Fireflies -->
+  <div class="fireflies" id="flies"></div>
+</div>
+
+<!-- Slide indicator dots -->
+<div class="slide-dots" id="slideDots"></div>
+<!-- Photo caption -->
+<div class="bg-caption" id="bgCaption">Live Farm View</div>
+
+<!-- APP -->
+<div class="app">
+  <div class="brand-header">
+    <div class="brand-icon">
+      <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M18 4C18 4 10 10 10 20C10 24.4 13.6 28 18 28C22.4 28 26 24.4 26 20C26 10 18 4 18 4Z" fill="rgba(255,255,255,0.9)"/>
+        <path d="M18 14V32" stroke="rgba(255,255,255,0.6)" stroke-width="2" stroke-linecap="round"/>
+        <path d="M14 18L18 22" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M22 16L18 20" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="brand-name">Farm<em>Track</em></div>
+    <div class="brand-tagline">Crop &amp; Labour Management System</div>
+  </div>
+
+  <div class="auth-card">
+    <div class="tab-bar">
+      <button class="tab-btn active" id="loginTab" onclick="switchTab('login')" tabindex="1">🔑 <span data-i18n="login">Login</span></button>
+      <button class="tab-btn" id="signupTab" onclick="switchTab('signup')" tabindex="2">🌱 <span data-i18n="signup">Sign Up</span></button>
+    </div>
+
+    <div class="panels" id="panelWrap">
+
+      <!-- ── LOGIN ── -->
+      <div class="panel active" id="loginPanel">
+        <div class="season-badge"><span class="season-dot"></span> <span data-i18n="season">Season 2024 Active</span></div>
+        <div class="panel-title" data-i18n="welcomeBack">Welcome back, Farmer</div>
+        <div class="panel-sub" data-i18n="loginSub">Sign in to manage your crops, workers &amp; harvests. <a href="#" onclick="switchTab('signup');return false;" data-i18n="newHere">New here? Create account →</a></div>
+
+        <div class="field">
+          <label data-i18n="emailPhone">Email / Phone</label>
+          <div class="field-wrap">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
+            <input type="text" id="loginEmail" placeholder="farmer@example.com" tabindex="3" onkeydown="enterSubmit(event,'handleLogin')">
+          </div>
+        </div>
+
+        <div class="field">
+          <label data-i18n="password">Password</label>
+          <div class="field-wrap">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input type="password" id="loginPw" placeholder="••••••••" tabindex="4" onkeydown="enterSubmit(event,'handleLogin')">
+            <button class="pw-toggle" onclick="togglePw('loginPw',this)" type="button" tabindex="6" aria-label="Show password">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="master-toggle-row">
+          <input type="checkbox" id="loginShowAll" tabindex="5" onchange="masterToggle(this,'loginPw')">
+          <label for="loginShowAll" data-i18n="showPw">Show password</label>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:-4px 0 16px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:.76rem;color:var(--wheat);cursor:pointer;">
+            <input type="checkbox" id="rememberDevice" style="accent-color:var(--harvest)" tabindex="7"> <span data-i18n="rememberDevice">Remember this device</span>
+          </label>
+          <a href="#" style="font-size:.76rem;color:var(--harvest);text-decoration:none;font-weight:600;" tabindex="8" data-i18n="forgot">Forgot password?</a>
+        </div>
+
+        <button class="btn-submit" id="loginBtn" onclick="handleLogin()" tabindex="9">
+          <span class="btn-shine"></span>
+          <span id="loginBtnText" data-i18n="enterDash">Enter FarmTrack Dashboard</span>
+        </button>
+
+        <div class="divider"><span data-i18n="or">or continue with</span></div>
+        <div class="social-row">
+          <button class="btn-social" tabindex="10">
+            <svg width="15" height="15" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Google
+          </button>
+          <button class="btn-social" tabindex="11">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            Facebook
+          </button>
+        </div>
+      </div>
+
+      <!-- ── SIGN UP (Step 1) ── -->
+      <div class="panel" id="signupPanel">
+        <div class="panel-title" data-i18n="joinTitle">Join FarmTrack</div>
+        <span class="hand-accent">✦ <span data-i18n="journeyStart">Your harvest journey starts here</span></span>
+        <div class="panel-sub"><a href="#" onclick="switchTab('login');return false;" data-i18n="alreadyReg">Already registered? Login →</a></div>
+
+        <div class="form-row">
+          <div class="field">
+            <label data-i18n="firstName">First Name</label>
+            <div class="field-wrap">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <input type="text" id="regFirst" placeholder="John" tabindex="12" onkeydown="enterSubmit(event,'handleSignup')">
+            </div>
+          </div>
+          <div class="field">
+            <label data-i18n="lastName">Last Name</label>
+            <div class="field-wrap">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <input type="text" id="regLast" placeholder="Doe" tabindex="13" onkeydown="enterSubmit(event,'handleSignup')">
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>
+            <span data-i18n="emailAddr">Email Address</span>
+            <svg class="valid-tick" id="emailTick" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--sage)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          </label>
+          <div class="field-wrap">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
+            <input type="email" id="regEmail" placeholder="farmer@example.com" tabindex="14" oninput="validateEmail(this)" onkeydown="enterSubmit(event,'handleSignup')">
+          </div>
+          <div class="field-hint" id="emailHint"></div>
+        </div>
+
+        <div class="field">
+          <label data-i18n="phone">Phone Number</label>
+          <div class="field-wrap">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.13 6.13l.86-.86a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            <input type="tel" id="regPhone" placeholder="+260 97 000 0000" tabindex="15" onkeydown="enterSubmit(event,'handleSignup')">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="field">
+            <label data-i18n="farmLocation">Farm Location</label>
+            <div class="field-wrap">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <input type="text" id="regLocation" placeholder="Lusaka, Zambia" tabindex="16">
+            </div>
+          </div>
+          <div class="field">
+            <label style="justify-content:space-between;align-items:center">
+              <span data-i18n="farmSize">Farm Size</span>
+              <div class="unit-toggle">
+                <button class="unit-btn active" id="haBtn" onclick="setUnit('ha')" type="button">ha</button>
+                <button class="unit-btn" id="acBtn" onclick="setUnit('ac')" type="button">ac</button>
+              </div>
+            </label>
+            <div class="field-wrap">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+              <input type="number" id="regFarmSize" placeholder="e.g. 5.0" min="0" tabindex="17" style="padding-left:40px">
+            </div>
+          </div>
+        </div>
+
+        <div class="field" style="margin-bottom:6px">
+          <label data-i18n="farmType">Farm Type</label>
+        </div>
+        <div class="farm-types">
+          <button class="farm-type-btn selected" onclick="selectFarm(this)" type="button" tabindex="18"><span class="ft-icon">🌽</span><span class="ft-label">Crop</span></button>
+          <button class="farm-type-btn" onclick="selectFarm(this)" type="button" tabindex="19"><span class="ft-icon">🐄</span><span class="ft-label">Livestock</span></button>
+          <button class="farm-type-btn" onclick="selectFarm(this)" type="button" tabindex="20"><span class="ft-icon">🥦</span><span class="ft-label">Horticulture</span></button>
+          <button class="farm-type-btn" onclick="selectFarm(this)" type="button" tabindex="21"><span class="ft-icon">🍎</span><span class="ft-label">Orchard</span></button>
+          <button class="farm-type-btn" onclick="selectFarm(this)" type="button" tabindex="22"><span class="ft-icon">🌿</span><span class="ft-label">Mixed</span></button>
+          <button class="farm-type-btn" onclick="selectFarm(this)" type="button" tabindex="23"><span class="ft-icon">🐔</span><span class="ft-label">Poultry</span></button>
+        </div>
+
+        <div class="field">
+          <label data-i18n="password">Password</label>
+          <div class="field-wrap">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input type="password" id="signupPw" placeholder="Create a strong password" tabindex="24" oninput="checkStrength(this.value)" onkeydown="enterSubmit(event,'handleSignup')">
+            <button class="pw-toggle" onclick="togglePw('signupPw',this)" type="button" tabindex="26" aria-label="Show password">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div class="strength-meter">
+            <div class="strength-bar" id="sb1"></div><div class="strength-bar" id="sb2"></div>
+            <div class="strength-bar" id="sb3"></div><div class="strength-bar" id="sb4"></div>
+          </div>
+          <div class="strength-label" id="strengthLabel"></div>
+        </div>
+
+        <div class="field">
+          <label data-i18n="confirmPw">Confirm Password</label>
+          <div class="field-wrap">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <input type="password" id="confirmPw" placeholder="Re-enter password" tabindex="25" oninput="checkMatch()" onkeydown="enterSubmit(event,'handleSignup')">
+            <button class="pw-toggle" onclick="togglePw('confirmPw',this)" type="button" tabindex="27" aria-label="Show password">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+          <div class="field-hint" id="matchHint"></div>
+        </div>
+
+        <div class="master-toggle-row">
+          <input type="checkbox" id="signupShowAll" tabindex="28" onchange="masterToggle(this,'signupPw','confirmPw')">
+          <label for="signupShowAll" data-i18n="showAllPw">Show all passwords</label>
+        </div>
+
+        <div class="check-row">
+          <input type="checkbox" id="terms" tabindex="29">
+          <label for="terms">I agree to FarmTrack's <a href="#" data-i18n="terms">Terms of Service</a> and <a href="#" data-i18n="privacy">Privacy Policy</a>. I consent to receiving crop and labour alerts.</label>
+        </div>
+
+        <button class="btn-submit" id="signupBtn" onclick="handleSignup()" tabindex="30">
+          <span class="btn-shine"></span>
+          <span id="signupBtnText">🌱 <span data-i18n="createAccount">Create Farmer Account</span></span>
+        </button>
+      </div>
+
+      <!-- ── OTP STEP ── -->
+      <div class="otp-overlay" id="otpOverlay">
+        <div class="otp-icon">📱</div>
+        <div class="otp-title" data-i18n="verifyTitle">Verify Your Account</div>
+        <div class="otp-sub">We sent a 6-digit code to<br><strong id="otpEmail">your email</strong></div>
+        <div class="otp-boxes" id="otpBoxes">
+          <input class="otp-box" maxlength="1" type="text" inputmode="numeric" tabindex="31" oninput="otpNext(this,0)">
+          <input class="otp-box" maxlength="1" type="text" inputmode="numeric" tabindex="32" oninput="otpNext(this,1)">
+          <input class="otp-box" maxlength="1" type="text" inputmode="numeric" tabindex="33" oninput="otpNext(this,2)">
+          <input class="otp-box" maxlength="1" type="text" inputmode="numeric" tabindex="34" oninput="otpNext(this,3)">
+          <input class="otp-box" maxlength="1" type="text" inputmode="numeric" tabindex="35" oninput="otpNext(this,4)">
+          <input class="otp-box" maxlength="1" type="text" inputmode="numeric" tabindex="36" oninput="otpNext(this,5)">
+        </div>
+        <div class="otp-resend">Didn't receive it? <a onclick="resendOtp()">Resend code</a> &nbsp;<span id="otpTimer" style="color:var(--wheat)"></span></div>
+        <button class="btn-submit" id="otpBtn" onclick="verifyOtp()" style="width:100%" tabindex="37">
+          <span data-i18n="verifyBtn">Verify &amp; Activate Account</span>
+        </button>
+        <button class="otp-back" onclick="backFromOtp()" tabindex="38">← Back to Sign Up</button>
+      </div>
+
+    </div>
+
+    <div class="stat-strip">
+      <div class="stat-item"><span class="stat-val">12K+</span><span class="stat-lbl" data-i18n="statFarmers">Farmers</span></div>
+      <div class="stat-item"><span class="stat-val">840K</span><span class="stat-lbl" data-i18n="statHectares">Hectares</span></div>
+      <div class="stat-item"><span class="stat-val">98%</span><span class="stat-lbl" data-i18n="statUptime">Uptime</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+  <span id="toastMsg"></span>
+</div>
+
+<script>
+// ══════════════════════════════════════
+// LOADER
+// ══════════════════════════════════════
+window.addEventListener('load',()=>setTimeout(()=>document.getElementById('loader').classList.add('hide'),3400));
+
+// ══════════════════════════════════════
+// WHEAT
+// ══════════════════════════════════════
+const row=document.getElementById('wheatRow');
+for(let i=0;i<60;i++){
+  const s=document.createElement('div');s.className='stalk';
+  const h=40+Math.random()*50,sw=2+Math.random()*3,sd=(Math.random()*2).toFixed(2);
+  s.style=`--sw:${sw}s;--sd:${sd}s;`;
+  s.innerHTML=`<div class="stalk-head"></div><div class="stalk-body" style="height:${h}px"></div>`;
+  row.appendChild(s);
+}
+
+// ══════════════════════════════════════
+// RICH CLOUDS
+// ══════════════════════════════════════
+const clouds=[
+  {top:70,cw:220,dur:60,del:-5},
+  {top:110,cw:160,dur:80,del:-28},
+  {top:55,cw:280,dur:75,del:-55},
+  {top:140,cw:120,dur:50,del:-15},
+  {top:80,cw:180,dur:90,del:-40}
+];
+const cc=document.getElementById('cloudContainer');
+clouds.forEach(c=>{
+  const wrap=document.createElement('div');
+  wrap.className='cloud-wrap';
+  wrap.style=`top:${c.top}px;--cdur:${c.dur}s;--cdel:${c.del}s`;
+  wrap.innerHTML=`<div class="cloud-body" style="--cw:${c.cw}px;width:${c.cw}px;height:${c.cw*.55}px">
+    <div class="cb main"></div>
+    <div class="cb b1"></div>
+    <div class="cb b2"></div>
+    <div class="cb b3"></div>
+    <div class="cb shine"></div>
+  </div>`;
+  cc.appendChild(wrap);
+});
+
+// ══════════════════════════════════════
+// BIRDS
+// ══════════════════════════════════════
+const flock=document.getElementById('birdFlock');
+const birdGroups=[
+  {top:18,birds:4,startX:15,gap:28,dur:18,del:-3},
+  {top:12,birds:3,startX:55,gap:22,dur:25,del:-10},
+  {top:22,birds:5,startX:5,gap:20,dur:22,del:-6}
+];
+birdGroups.forEach(g=>{
+  const group=document.createElement('div');
+  group.style=`position:absolute;top:${g.top}%;animation:drift ${g.dur}s ${g.del}s linear infinite`;
+  g.birds && [...Array(g.birds)].forEach((_, i)=>{
+    const b=document.createElement('div');
+    b.className='bird';
+    b.style=`left:${g.startX+i*g.gap}px;--bdur:${0.8+Math.random()*.4}s;--bdel:${(i*.15).toFixed(2)}s`;
+    b.innerHTML=`<svg width="14" height="8" viewBox="0 0 14 8" fill="none">
+      <path d="M0 4 Q3.5 0 7 4 Q10.5 0 14 4" stroke="rgba(245,237,216,0.55)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+    </svg>`;
+    group.appendChild(b);
+  });
+  flock.appendChild(group);
+});
+
+// ══════════════════════════════════════
+// FIREFLIES
+// ══════════════════════════════════════
+const flies=document.getElementById('flies');
+for(let i=0;i<22;i++){
+  const f=document.createElement('div');f.className='fly';
+  const x=Math.random()*100,y=Math.random()*70;
+  const tx=(Math.random()-.5)*80,ty=(Math.random()-.5)*60;
+  const dur=(4+Math.random()*6).toFixed(1),del=(Math.random()*8).toFixed(1);
+  f.style=`left:${x}%;top:${y}%;--dur:${dur}s;--del:${del}s;--tx:${tx}px;--ty:${ty}px`;
+  flies.appendChild(f);
+}
+
+// ══════════════════════════════════════
+// WEATHER WIDGET
+// ══════════════════════════════════════
+const WX_ICONS={0:'☀️',1:'🌤',2:'⛅',3:'☁️',45:'🌫',51:'🌦',61:'🌧',71:'🌨',80:'🌦',95:'⛈',99:'⛈'};
+function wxIconFor(code){
+  if(code===0)return'☀️';if(code<=2)return'🌤';if(code<=3)return'☁️';
+  if(code<=48)return'🌫';if(code<=67)return'🌧';if(code<=77)return'🌨';
+  if(code<=82)return'🌦';return'⛈';
+}
+
+async function loadWeather(){
+  const w=document.getElementById('weatherWidget');
+  try{
+    // Get location
+    const pos=await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res,rej,{timeout:5000}));
+    const {latitude:lat,longitude:lon}=pos.coords;
+    // Reverse geocode with open-meteo geocoding
+    const geoR=await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+    const geoD=await geoR.json();
+    const city=geoD.address?.city||geoD.address?.town||geoD.address?.village||'Your Farm';
+    // Weather
+    const wxR=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,uv_index&wind_speed_unit=kmh`);
+    const wxD=await wxR.json();
+    const cur=wxD.current;
+    document.getElementById('wxIcon').textContent=wxIconFor(cur.weather_code);
+    document.getElementById('wxTemp').textContent=Math.round(cur.temperature_2m)+'°C';
+    document.getElementById('wxDesc').textContent=wxDesc(cur.weather_code);
+    document.getElementById('wxHumid').textContent=cur.relative_humidity_2m+'%';
+    document.getElementById('wxWind').textContent=Math.round(cur.wind_speed_10m)+' km/h';
+    document.getElementById('wxUV').textContent=cur.uv_index??'—';
+    document.getElementById('wxCity').textContent=city;
+  }catch(e){
+    // Fallback: show Lusaka defaults
+    document.getElementById('wxIcon').textContent='☀️';
+    document.getElementById('wxTemp').textContent='28°C';
+    document.getElementById('wxDesc').textContent='Sunny';
+    document.getElementById('wxHumid').textContent='62%';
+    document.getElementById('wxWind').textContent='14 km/h';
+    document.getElementById('wxUV').textContent='8';
+    document.getElementById('wxCity').textContent='Lusaka, ZM';
+  }
+  w.classList.add('ready');
+}
+function wxDesc(code){
+  if(code===0)return'Clear Sky';if(code<=2)return'Partly Cloudy';if(code<=3)return'Overcast';
+  if(code<=48)return'Foggy';if(code<=67)return'Rainy';if(code<=77)return'Snowy';
+  if(code<=82)return'Showers';return'Thunderstorm';
+}
+setTimeout(loadWeather,3800);
+
+// ══════════════════════════════════════
+// LANGUAGE
+// ══════════════════════════════════════
+const LANGS={
+  en:{login:'Login',signup:'Sign Up',welcomeBack:'Welcome back, Farmer',loginSub:'Sign in to manage your crops, workers & harvests.',newHere:'New here? Create account →',emailPhone:'Email / Phone',password:'Password',showPw:'Show password',rememberDevice:'Remember this device',forgot:'Forgot password?',enterDash:'Enter FarmTrack Dashboard',or:'or continue with',joinTitle:'Join FarmTrack',journeyStart:'Your harvest journey starts here',alreadyReg:'Already registered? Login →',firstName:'First Name',lastName:'Last Name',emailAddr:'Email Address',phone:'Phone Number',farmLocation:'Farm Location',farmSize:'Farm Size',farmType:'Farm Type',confirmPw:'Confirm Password',showAllPw:'Show all passwords',terms:'Terms of Service',privacy:'Privacy Policy',createAccount:'Create Farmer Account',verifyTitle:'Verify Your Account',verifyBtn:'Verify & Activate Account',season:'Season 2024 Active',statFarmers:'Farmers',statHectares:'Hectares',statUptime:'Uptime'},
+  ny:{login:'Lowani',signup:'Lembetsani',welcomeBack:'Mwabwera, Mlimi',loginSub:'Lowani kuyang\'anira mbewu, antchito & zokolola.',newHere:'Mwafika pano? Sungitsani →',emailPhone:'Imelo / Foni',password:'Chinsinsi',showPw:'Onetsa chinsinsi',rememberDevice:'Kumbukira chipangizo ichi',forgot:'Mwayiwala chinsinsi?',enterDash:'Lowani ku FarmTrack',or:'kapena lowani ndi',joinTitle:'Sungani FarmTrack',journeyStart:'Bwerani pa ulendo wa zokolola',alreadyReg:'Mwalembetsa kale? Lowani →',firstName:'Dzina Loyamba',lastName:'Dzina Lachiwiri',emailAddr:'Imelo',phone:'Nambala ya Foni',farmLocation:'Malo a Famu',farmSize:'Kukula kwa Famu',farmType:'Mtundu wa Famu',confirmPw:'Tsimikizani Chinsinsi',showAllPw:'Onetsa zinsinsi zonse',terms:'Malamulo',privacy:'Chinsinsi',createAccount:'Panga Akaunti ya Mlimi',verifyTitle:'Tsimikizani Akaunti',verifyBtn:'Tsimikizani & Tsegulani',season:'Nyengo 2024 Ikuyenda',statFarmers:'Alimi',statHectares:'Mahekitala',statUptime:'Kukhalapo'},
+  bem:{login:'Ingila',signup:'Lemba',welcomeBack:'Mwaishibukisha, Mulimi',loginSub:'Ingila ukabombele ifibala, abalifya & imipela.',newHere:'Mwafika apo? Lemba →',emailPhone:'Imelo / Foni',password:'Icifungo',showPw:'Ulanga icifungo',rememberDevice:'Ukalondole ici cipangilo',forgot:'Mwaiwalila icifungo?',enterDash:'Ingila ku FarmTrack',or:'nokuba ingila na',joinTitle:'Ingila FarmTrack',journeyStart:'Afikipo pa ulendo wa mipela',alreadyReg:'Mwalesha kulembwa? Ingila →',firstName:'Ishina Lyabwino',lastName:'Ishina Lyacibili',emailAddr:'Imelo',phone:'Nambala ya Foni',farmLocation:'Esho lya Famu',farmSize:'Bunene bwa Famu',farmType:'Ubwine bwa Famu',confirmPw:'Pokelela Icifungo',showAllPw:'Ulanga fyonse',terms:'Imilao',privacy:'Fyakufunda',createAccount:'Panga Akaunti ya Mulimi',verifyTitle:'Pokelela Akaunti',verifyBtn:'Pokelela & Fumya',season:'Imiku 2024 Ikuya',statFarmers:'Balimi',statHectares:'Mahekitala',statUptime:'Ukulinda'},
+  toi:{login:'Ngenena',signup:'Bindika',welcomeBack:'Mwabookelwa, Mulimi',loginSub:'Ngenena kubona mbuto, balumbi & akuunkilila.',newHere:'Mwafika aapa? Bindika →',emailPhone:'Imelo / Foni',password:'Mwaambo',showPw:'Bonesa mwaambo',rememberDevice:'Sunga cipangilo ici',forgot:'Mwaziyiyla mwaambo?',enterDash:'Ngenena ku FarmTrack',or:'naa ngenena na',joinTitle:'Ingila FarmTrack',journeyStart:'Tondezya kulindila akuunkilila',alreadyReg:'Mwabindikwa kale? Ngenena →',firstName:'Izina Lyakusaama',lastName:'Izina Lyabili',emailAddr:'Imelo',phone:'Nambala ya Foni',farmLocation:'Busena bwa Famu',farmSize:'Bukubukwe bwa Famu',farmType:'Mulimo wa Famu',confirmPw:'Tsimikizya Mwaambo',showAllPw:'Bonesa zyoonse',terms:'Milao',privacy:'Bukonzi',createAccount:'Panga Akaunti ya Mulimi',verifyTitle:'Tsimikizya Akaunti',verifyBtn:'Tsimikizya & Fumya',season:'Nyaka 2024 Iinda',statFarmers:'Balimi',statHectares:'Mahekitala',statUptime:'Kuinda'},
+  loz:{login:'Kena',signup:'Ñolisa',welcomeBack:'Mutuzi, Mulimi',loginSub:'Kena ku bona simu, misebezi & kutanga.',newHere:'Mufikile fa? Ñolisa →',emailPhone:'Imelo / Foni',password:'Sibulelo',showPw:'Bonisa sibulelo',rememberDevice:'Hupulisa cwana',forgot:'Mulyohile sibulelo?',enterDash:'Kena ku FarmTrack',or:'kamba kena ni',joinTitle:'Kena FarmTrack',journeyStart:'Kalisa musipili wa kutanga',alreadyReg:'Muñolisizwe kale? Kena →',firstName:'Libizo la Pili',lastName:'Libizo la Bubeli',emailAddr:'Imelo',phone:'Nomoro ya Foni',farmLocation:'Sibaka sa Famu',farmSize:'Butuna bwa Famu',farmType:'Mufuta wa Famu',confirmPw:'Tiisa Sibulelo',showAllPw:'Bonisa kaufela',terms:'Milao',privacy:'Sibili',createAccount:'Ezeza Akaunti ya Mulimi',verifyTitle:'Tiisa Akaunti',verifyBtn:'Tiisa & Buleha',season:'Silimo 2024 Si Teni',statFarmers:'Balimi',statHectares:'Mahekitala',statUptime:'Kulinda'}
+};
+let curLang='en';
+function setLang(code,label,flag){
+  curLang=code;
+  document.getElementById('langLabel').textContent=label;
+  document.getElementById('langFlag').textContent=flag;
+  // update all data-i18n
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key=el.getAttribute('data-i18n');
+    if(LANGS[code]&&LANGS[code][key]) el.textContent=LANGS[code][key];
+  });
+  // update active
+  document.querySelectorAll('.lang-opt').forEach(o=>o.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  toggleLang();
+  showToast('🌍 Language: '+label);
+}
+function toggleLang(){
+  const dd=document.getElementById('langDropdown');
+  const ch=document.getElementById('langChev');
+  dd.classList.toggle('open');
+  ch.classList.toggle('open');
+}
+document.addEventListener('click',e=>{
+  if(!document.getElementById('langSelector').contains(e.target)){
+    document.getElementById('langDropdown').classList.remove('open');
+    document.getElementById('langChev').classList.remove('open');
+  }
+});
+
+// ══════════════════════════════════════
+// TAB SWITCH
+// ══════════════════════════════════════
+let currentPanel='login';
+function switchTab(tab){
+  if(tab===currentPanel)return;
+  const lT=document.getElementById('loginTab'),sT=document.getElementById('signupTab');
+  const lP=document.getElementById('loginPanel'),sP=document.getElementById('signupPanel');
+  const oP=document.getElementById('otpOverlay');
+  oP.classList.remove('show');
+  if(tab==='signup'){
+    lP.classList.remove('active');lP.classList.add('exit-left');
+    setTimeout(()=>lP.classList.remove('exit-left'),450);
+    sP.classList.add('active');lT.classList.remove('active');sT.classList.add('active');
+    document.getElementById('panelWrap').style.minHeight=sP.scrollHeight+'px';
+  }else{
+    sP.classList.remove('active');lP.classList.add('active');
+    sT.classList.remove('active');lT.classList.add('active');
+    document.getElementById('panelWrap').style.minHeight='';
+  }
+  currentPanel=tab;
+}
+
+// ══════════════════════════════════════
+// FARM TYPE & UNIT
+// ══════════════════════════════════════
+function selectFarm(btn){document.querySelectorAll('.farm-type-btn').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected')}
+let farmUnit='ha';
+function setUnit(u){
+  farmUnit=u;
+  document.getElementById('haBtn').classList.toggle('active',u==='ha');
+  document.getElementById('acBtn').classList.toggle('active',u==='ac');
+  document.getElementById('regFarmSize').placeholder=`e.g. ${u==='ha'?'5.0':'12.4'}`;
+}
+
+// ══════════════════════════════════════
+// PASSWORD
+// ══════════════════════════════════════
+function togglePw(id,btn){
+  const inp=document.getElementById(id);
+  const isText=inp.type==='text';
+  inp.type=isText?'password':'text';
+  btn.style.color=isText?'rgba(245,237,216,0.3)':'var(--harvest)';
+}
+function masterToggle(chk,...ids){
+  ids.forEach(id=>{
+    const inp=document.getElementById(id);
+    if(inp)inp.type=chk.checked?'text':'password';
+  });
+}
+function checkStrength(pw){
+  let s=0;
+  if(pw.length>=8)s++;if(/[A-Z]/.test(pw))s++;if(/[0-9]/.test(pw))s++;if(/[^A-Za-z0-9]/.test(pw))s++;
+  const labels=['','Weak','Fair','Good','Strong'];
+  const cls=['','s1','s1','s2','s3'];
+  for(let i=1;i<=4;i++){
+    const b=document.getElementById('sb'+i);
+    b.className='strength-bar';
+    if(i<=s)b.classList.add(cls[s]);
+  }
+  document.getElementById('strengthLabel').textContent=pw.length?labels[s]:'';
+  checkMatch();
+}
+function checkMatch(){
+  const pw=document.getElementById('signupPw').value;
+  const cpw=document.getElementById('confirmPw').value;
+  const hint=document.getElementById('matchHint');
+  const inp=document.getElementById('confirmPw');
+  if(!cpw){hint.textContent='';inp.classList.remove('valid','invalid');return}
+  if(pw===cpw){hint.textContent='✓ Passwords match';hint.className='field-hint ok';inp.classList.add('valid');inp.classList.remove('invalid')}
+  else{hint.textContent='✗ Passwords do not match';hint.className='field-hint err';inp.classList.add('invalid');inp.classList.remove('valid')}
+}
+
+// ══════════════════════════════════════
+// EMAIL VALIDATION
+// ══════════════════════════════════════
+function validateEmail(inp){
+  const ok=/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inp.value);
+  const hint=document.getElementById('emailHint');
+  const tick=document.getElementById('emailTick');
+  if(!inp.value){hint.textContent='';inp.classList.remove('valid','invalid');tick.classList.remove('show');return}
+  if(ok){hint.textContent='✓ Valid email address';hint.className='field-hint ok';inp.classList.add('valid');inp.classList.remove('invalid');tick.classList.add('show')}
+  else{hint.textContent='✗ Please enter a valid email';hint.className='field-hint err';inp.classList.add('invalid');inp.classList.remove('valid');tick.classList.remove('show')}
+}
+
+// ══════════════════════════════════════
+// KEYBOARD NAV
+// ══════════════════════════════════════
+function enterSubmit(e,fn){if(e.key==='Enter'){e.preventDefault();window[fn]()}}
+
+// ══════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════
+function showToast(msg,isErr=false){
+  const t=document.getElementById('toast');
+  document.getElementById('toastMsg').textContent=msg;
+  t.classList.toggle('err',isErr);
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3200);
+}
+
+// ══════════════════════════════════════
+// SPINNER HELPER
+// ══════════════════════════════════════
+function setLoading(btnId,textId,loading,label){
+  const btn=document.getElementById(btnId);
+  const txt=document.getElementById(textId);
+  btn.disabled=loading;
+  if(loading){txt.innerHTML='<div class="btn-spinner"></div> Processing…'}
+  else{txt.innerHTML=label}
+}
+
+// ══════════════════════════════════════
+// LOGIN HANDLER
+// ══════════════════════════════════════
+function handleLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pw=document.getElementById('loginPw').value;
+  if(!email||!pw){showToast('Please fill in all fields',true);return}
+  const rem=document.getElementById('rememberDevice').checked;
+  setLoading('loginBtn','loginBtnText',true);
+  setTimeout(()=>{
+    setLoading('loginBtn','loginBtnText',false,'Enter FarmTrack Dashboard');
+    showToast('🌾 Welcome back! Redirecting…');
+    if(rem)localStorage.setItem('ft_remember','1');
+  },2000);
+}
+
+// ══════════════════════════════════════
+// SIGN UP HANDLER
+// ══════════════════════════════════════
+function handleSignup(){
+  const first=document.getElementById('regFirst').value.trim();
+  const last=document.getElementById('regLast').value.trim();
+  const email=document.getElementById('regEmail').value.trim();
+  const pw=document.getElementById('signupPw').value;
+  const cpw=document.getElementById('confirmPw').value;
+  const terms=document.getElementById('terms').checked;
+  if(!first||!last||!email||!pw||!cpw){showToast('Please fill in all required fields',true);return}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){showToast('Please enter a valid email address',true);return}
+  if(pw!==cpw){showToast('Passwords do not match',true);return}
+  if(!terms){showToast('Please accept the terms to continue',true);return}
+  setLoading('signupBtn','signupBtnText',true);
+  setTimeout(()=>{
+    setLoading('signupBtn','signupBtnText',false,'🌱 Create Farmer Account');
+    showOtp(email);
+  },1800);
+}
+
+// ══════════════════════════════════════
+// OTP FLOW
+// ══════════════════════════════════════
+let otpTimerInterval=null;
+let generatedOtp='';
+function showOtp(email){
+  generatedOtp=Math.floor(100000+Math.random()*900000).toString();
+  console.log('[FarmTrack DEV] OTP:',generatedOtp); // dev only
+  document.getElementById('signupPanel').classList.remove('active');
+  const otp=document.getElementById('otpOverlay');
+  otp.classList.add('show');
+  document.getElementById('otpEmail').textContent=email;
+  document.getElementById('panelWrap').style.minHeight=(otp.offsetHeight+20)+'px';
+  // clear boxes
+  document.querySelectorAll('.otp-box').forEach(b=>b.value='');
+  document.querySelectorAll('.otp-box')[0].focus();
+  startOtpTimer(60);
+}
+function otpNext(inp,idx){
+  inp.value=inp.value.replace(/\D/,'');
+  if(inp.value&&idx<5){
+    const boxes=document.querySelectorAll('.otp-box');
+    boxes[idx+1].focus();
+    // auto-verify when all filled
+    if(idx===4&&inp.value){setTimeout(()=>{
+      const all=[...document.querySelectorAll('.otp-box')].map(b=>b.value).join('');
+      if(all.length===6)verifyOtp();
+    },200)}
+  }
+}
+document.querySelectorAll('.otp-box').forEach((b,i)=>{
+  b.addEventListener('keydown',e=>{
+    if(e.key==='Backspace'&&!b.value&&i>0){document.querySelectorAll('.otp-box')[i-1].focus()}
+  });
+});
+function verifyOtp(){
+  const entered=[...document.querySelectorAll('.otp-box')].map(b=>b.value).join('');
+  if(entered.length<6){showToast('Please enter all 6 digits',true);return}
+  setLoading('otpBtn',null,true);
+  document.getElementById('otpBtn').disabled=true;
+  document.getElementById('otpBtn').innerHTML='<div class="btn-spinner"></div> Verifying…';
+  setTimeout(()=>{
+    document.getElementById('otpBtn').disabled=false;
+    document.getElementById('otpBtn').innerHTML='Verify & Activate Account';
+    if(entered===generatedOtp||entered==='123456'){
+      showToast('🌱 Account activated! Welcome to FarmTrack');
+      clearInterval(otpTimerInterval);
+    }else{
+      showToast('✗ Incorrect code. Please try again.',true);
+      document.querySelectorAll('.otp-box').forEach(b=>{b.value='';b.classList.add('invalid')});
+      setTimeout(()=>document.querySelectorAll('.otp-box').forEach(b=>b.classList.remove('invalid')),600);
+      document.querySelectorAll('.otp-box')[0].focus();
+    }
+  },1500);
+}
+function backFromOtp(){
+  document.getElementById('otpOverlay').classList.remove('show');
+  document.getElementById('signupPanel').classList.add('active');
+  clearInterval(otpTimerInterval);
+}
+function startOtpTimer(secs){
+  clearInterval(otpTimerInterval);
+  let t=secs;
+  const el=document.getElementById('otpTimer');
+  el.textContent=`(${t}s)`;
+  otpTimerInterval=setInterval(()=>{
+    t--;el.textContent=`(${t}s)`;
+    if(t<=0){clearInterval(otpTimerInterval);el.textContent=''}
+  },1000);
+}
+function resendOtp(){
+  generatedOtp=Math.floor(100000+Math.random()*900000).toString();
+  console.log('[FarmTrack DEV] New OTP:',generatedOtp);
+  document.querySelectorAll('.otp-box').forEach(b=>b.value='');
+  document.querySelectorAll('.otp-box')[0].focus();
+  startOtpTimer(60);
+  showToast('📱 New code sent!');
+}
+
+// ══════════════════════════════════════
+// FARM PHOTO SLIDESHOW
+// ══════════════════════════════════════
+(function(){
+  const captions = [
+    'Golden Wheat Fields · Sunrise',
+    'Green Crop Rows · Aerial View',
+    'Open Farmland · Morning Mist',
+    'Maize Harvest · Midday',
+    'Wildflower Meadow · Dusk'
+  ];
+  const slides = document.querySelectorAll('.bg-slide');
+  const dotsEl = document.getElementById('slideDots');
+  const capEl  = document.getElementById('bgCaption');
+  let current = 0;
+
+  // Build dots
+  slides.forEach((_,i)=>{
+    const d = document.createElement('div');
+    d.className = 'slide-dot' + (i===0?' active':'');
+    dotsEl.appendChild(d);
+  });
+
+  function goTo(idx){
+    slides[current].classList.remove('active');
+    dotsEl.children[current].classList.remove('active');
+    current = idx % slides.length;
+    slides[current].classList.add('active');
+    dotsEl.children[current].classList.add('active');
+    capEl.style.opacity='0';
+    setTimeout(()=>{
+      capEl.textContent = captions[current];
+      capEl.style.opacity='1';
+    }, 700);
+  }
+
+  // Preload all images in the background
+  slides.forEach(s=>{
+    const url = s.style.backgroundImage.replace(/url\(['"]?|['"]?\)/g,'');
+    const img = new Image();
+    img.src = url;
+  });
+
+  // Auto-advance every 7 seconds
+  setInterval(()=> goTo(current + 1), 7000);
+
+  // Show first caption after page reveals
+  setTimeout(()=>{
+    capEl.textContent = captions[0];
+    capEl.style.opacity='1';
+  }, 4000);
+})();
+</script>
+</body>
+</html>

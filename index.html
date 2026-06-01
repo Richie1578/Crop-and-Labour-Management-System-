@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FarmTrack - Crop & Labour Management</title>
+  <meta name="description" content="FarmTrack crop and labour management system">
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@400;700;900&family=Caveat:wght@600&display=swap"
+    rel="stylesheet">
+  <meta name="theme-color" content="#2c1a0e">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="./assets/css/farmtrack.css">
+  <link rel="stylesheet" href="./assets/css/landing.css">
+  <link rel="stylesheet" href="./assets/css/dashboard-theme.css">
+  <link rel="stylesheet" href="./assets/css/mobile-fixes.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+
+  <!-- LOADER (REPLACED FROM farmtrack (2).html) -->
+  <div id="loader">
+    <div class="loader-sprout">
+      <div class="sprout-leaf left"></div>
+      <div class="sprout-leaf right"></div>
+      <div class="sprout-stem"></div>
+    </div>
+    <div class="loader-brand">Farm<span>Track</span></div>
+    <div class="loader-sub">Crop &amp; Labour Management</div>
+    <div class="loader-bar-track">
+      <div class="loader-bar-fill"></div>
+    </div>
+  </div>
+
+  <div class="bg-photo" id="dash-bg-photo" aria-hidden="true"></div>
+
+  <!-- LANDING / AUTH -->
+  <div id="auth-overlay" class="auth-overlay landing-page">
+    <div id="weatherWidget">
+      <div class="wx-top">
+        <div class="wx-icon" id="wxIcon">⛅</div>
+        <div>
+          <div class="wx-temp" id="wxTemp">—</div>
+          <div class="wx-desc" id="wxDesc">Loading…</div>
+        </div>
+      </div>
+      <div class="wx-bottom">
+        <div class="wx-stat"><span class="wx-sv" id="wxHumid">—</span><span class="wx-sl">Humidity</span></div>
+        <div class="wx-stat"><span class="wx-sv" id="wxWind">—</span><span class="wx-sl">Wind</span></div>
+        <div class="wx-stat"><span class="wx-sv" id="wxUV">—</span><span class="wx-sl">UV Index</span></div>
+      </div>
+      <div class="wx-location"><span class="wx-dot"></span><span id="wxCity">Detecting…</span></div>
+    </div>
+
+    <div id="langSelector">
+      <button type="button" class="lang-btn" id="langBtn" onclick="toggleLang()" aria-label="Select language">
+        <span class="lang-flag" id="langFlag">🇿🇲</span>
+        <span id="langLabel">English</span>
+        <svg class="lang-chevron" id="langChev" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="lang-dropdown" id="langDropdown">
+        <button type="button" class="lang-opt active" onclick="setLandingLang('en','English','🇿🇲',this)"><span class="lang-flag">🇿🇲</span><span><div class="lo-name">English</div><div class="lo-native">English</div></span></button>
+        <button type="button" class="lang-opt" onclick="setLandingLang('ny','Nyanja','🌽',this)"><span class="lang-flag">🌽</span><span><div class="lo-name">Nyanja</div><div class="lo-native">Chinyanja</div></span></button>
+        <button type="button" class="lang-opt" onclick="setLandingLang('bem','Bemba','🌿',this)"><span class="lang-flag">🌿</span><span><div class="lo-name">Bemba</div><div class="lo-native">Ichibemba</div></span></button>
+      </div>
+    </div>
+
+    <div class="scene">
+      <div class="bg-slide active" style="background-image:url('https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1920&q=85&fit=crop')"></div>
+      <div class="bg-slide" style="background-image:url('https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=1920&q=85&fit=crop')"></div>
+      <div class="bg-slide" style="background-image:url('https://images.unsplash.com/photo-1464226184884-fa280b87c399?w=1920&q=85&fit=crop')"></div>
+      <div class="bg-slide" style="background-image:url('https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=1920&q=85&fit=crop')"></div>
+      <div class="bg-slide" style="background-image:url('https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=1920&q=85&fit=crop')"></div>
+      <div class="bg-overlay"></div>
+      <div class="bg-tint"></div>
+      <div class="sun-wrap"><div class="sun-rays"></div><div class="sun-core"></div></div>
+      <div class="bird-flock" id="birdFlock"></div>
+      <div id="cloudContainer"></div>
+      <div class="wheat-row" id="wheatRow"></div>
+      <div class="fireflies" id="flies"></div>
+    </div>
+
+    <div class="slide-dots" id="slideDots"></div>
+    <div class="bg-caption" id="bgCaption">Live Farm View</div>
+
+    <div class="app-auth-container">
+      <div class="brand-header">
+        <div class="brand-icon">
+          <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M18 4C18 4 10 10 10 20C10 24.4 13.6 28 18 28C22.4 28 26 24.4 26 20C26 10 18 4 18 4Z" fill="rgba(255,255,255,0.9)"/>
+            <path d="M18 14V32" stroke="rgba(255,255,255,0.6)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M14 18L18 22" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M22 16L18 20" stroke="rgba(255,255,255,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="brand-name">Farm<em>Track</em></div>
+        <div class="brand-tagline">Crop &amp; Labour Management System</div>
+      </div>
+
+      <div class="auth-card">
+        <div class="tab-bar">
+          <button type="button" class="tab-btn active" id="loginTab" onclick="switchAuthTab('login')">🔑 <span>Login</span></button>
+          <button type="button" class="tab-btn" id="signupTab" onclick="switchAuthTab('signup')">🌱 <span>Sign Up</span></button>
+        </div>
+
+        <div class="panels" id="panelWrap">
+          <div class="panel active" id="loginPanel">
+            <div class="season-badge"><span class="season-dot"></span> <span>Season 2026/2027 Active</span></div>
+            <div class="panel-title">Welcome back, Farmer</div>
+            <div class="panel-sub">Sign in to manage your crops, workers &amp; harvests. <a href="#" onclick="switchAuthTab('signup');return false;">New here? Create account →</a></div>
+
+            <div class="field">
+              <label>Email Address</label>
+              <div class="field-wrap">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
+                <input type="email" id="auth-email" placeholder="farmer@example.com" onkeydown="if(event.key==='Enter')handleAuth()">
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Password</label>
+              <div class="field-wrap">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input type="password" id="auth-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')handleAuth()">
+                <button type="button" class="pw-toggle" onclick="togglePw('auth-password')" aria-label="Show password">👁</button>
+              </div>
+            </div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin:-4px 0 16px">
+              <label style="display:flex;align-items:center;gap:8px;font-size:.76rem;color:var(--wheat);cursor:pointer;">
+                <input type="checkbox" id="rememberDevice" style="accent-color:var(--harvest)"> Remember this device
+              </label>
+              <button type="button" class="auth-demo-link" onclick="hideAuth()">Browse demo first →</button>
+            </div>
+
+            <button type="button" class="btn-submit" id="btn-auth-login" onclick="handleAuth()">
+              <span class="btn-shine"></span>
+              <span id="loginBtnText">Enter FarmTrack Dashboard</span>
+            </button>
+          </div>
+
+          <div class="panel" id="signupPanel">
+            <div class="panel-title">Join FarmTrack</div>
+            <span class="hand-accent">✦ Your harvest journey starts here</span>
+            <div class="panel-sub"><a href="#" onclick="switchAuthTab('login');return false;">Already registered? Login →</a></div>
+
+            <div class="form-row">
+              <div class="field">
+                <label>Farm Name</label>
+                <div class="field-wrap">
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  <input type="text" id="auth-farm-name" placeholder="e.g. Ndou's Farm">
+                </div>
+              </div>
+              <div class="field">
+                <label>Location</label>
+                <div class="field-wrap">
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  <input type="text" id="auth-location" placeholder="Lusaka, Zambia">
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Email Address</label>
+              <div class="field-wrap">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
+                <input type="email" id="signup-email" placeholder="farmer@example.com">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="field">
+                <label>Phone</label>
+                <div class="field-wrap">
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.59 1h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.13 6.13l.86-.86a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                  <input type="tel" id="auth-phone" placeholder="+260 97 000 0000">
+                </div>
+              </div>
+              <div class="field">
+                <label>Farm Size (ha)</label>
+                <div class="field-wrap">
+                  <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                  <input type="number" id="auth-size" placeholder="e.g. 5.0" min="0" step="0.1">
+                </div>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Password</label>
+              <div class="field-wrap">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <input type="password" id="signup-password" placeholder="Create a strong password" onkeydown="if(event.key==='Enter')handleAuth()">
+                <button type="button" class="pw-toggle" onclick="togglePw('signup-password')" aria-label="Show password">👁</button>
+              </div>
+            </div>
+
+            <button type="button" class="btn-submit" id="btn-auth-signup" onclick="handleAuth()">
+              <span class="btn-shine"></span>
+              <span id="signupBtnText">🌱 Create Farmer Account</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="stat-strip">
+          <div class="stat-item"><span class="stat-val">12K+</span><span class="stat-lbl">Farmers</span></div>
+          <div class="stat-item"><span class="stat-val">840K</span><span class="stat-lbl">Hectares</span></div>
+          <div class="stat-item"><span class="stat-val">98%</span><span class="stat-lbl">Uptime</span></div>
+        </div>
+      </div>
+      <div id="auth-status"></div>
+    </div>
+  </div>
+
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-collapse-btn" onclick="toggleSidebarCollapse()" title="Toggle Sidebar">
+      <span class="collapse-icon">◀</span>
+    </button>
+    <div class="sidebar-logo">
+      <div class="logo-icon-wrap">
+        <img src="./assets/images/logo-full.png" alt="Logo" style="width:100%; height:100%; object-fit:contain">
+      </div>
+      <div>
+        <h1>Farm<em style="color:var(--harvest);font-style:normal">Track</em></h1>
+        <p>Crop & Labour Management</p>
+      </div>
+    </div>
+    <div class="sb-season">
+      <div class="sb-season-icon">🌾</div>
+      <div>
+        <div class="sb-season-label">Current Season</div>
+        <div class="sb-season-val">2026 / 2027 Active</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">Overview</div>
+      <div class="nav-item active" onclick="showPage('dashboard')"><span class="icon">🏡</span> Dashboard <span
+          class="live-badge" style="margin-left:auto"><span class="live-dot"></span>Live</span></div>
+      <div class="nav-section">Farm</div>
+      <div class="nav-item" onclick="showPage('crops')"><span class="icon">🌱</span> Crop Management</div>
+      <div class="nav-item" onclick="showPage('fields')"><span class="icon">📐</span> Fields & Plots</div>
+      <div class="nav-item" onclick="showPage('harvest')"><span class="icon">🌾</span> Harvest Records</div>
+      <div class="nav-item" onclick="showPage('inputs')"><span class="icon">🧪</span> Input Application</div>
+      <div class="nav-item" onclick="showPage('inventory')"><span class="icon">📦</span> Inventory Store <span class="nav-badge" style="background:var(--amber-600)">Low</span></div>
+      <div class="nav-section">Labour</div>
+      <div class="nav-item" onclick="showPage('workers')"><span class="icon">👥</span> Workers</div>
+      <div class="nav-item" onclick="showPage('tasks')"><span class="icon">✅</span> Task Assignment <span
+          class="nav-badge">5</span></div>
+      <div class="nav-section">Intelligence</div>
+      <div class="nav-item" onclick="showPage('weather')"><span class="icon">🌦</span> Weather & Alerts <span
+          class="nav-badge" style="background:var(--red-600)">!</span></div>
+      <div class="nav-item" onclick="showPage('ai')"><span class="icon">🤖</span> AI Crop Advisor</div>
+      <div class="nav-item" onclick="showPage('sms')"><span class="icon">📱</span> SMS Notifications</div>
+      <div class="nav-section">Insights</div>
+      <div class="nav-item" onclick="showPage('market')"><span class="icon">📈</span> Market Intelligence</div>
+      <div class="nav-item" onclick="showPage('traceability')"><span class="icon">🔗</span> Traceability</div>
+      <div class="nav-item" onclick="showPage('reports')"><span class="icon">📊</span> Reports & Analytics</div>
+      <div class="nav-item" onclick="showPage('export')"><span class="icon">📤</span> Export Data</div>
+      <div class="nav-item" onclick="showPage('profile')"><span class="icon">👤</span> My Profile</div>
+      <div class="nav-section">System</div>
+      <div class="nav-item" onclick="showPage('settings')"><span class="icon">⚙️</span> Settings</div>
+      <div class="nav-item" onclick="showPage('about')"><span class="icon">ℹ️</span> About & Contact</div>
+      <div class="nav-item" id="nav-admin" style="display:none" onclick="showPage('admin')"><span class="icon">🛡️</span> Admin Panel</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="farm-badge">
+        <div class="name" id="display-farm-name">Ndou's Farm</div>
+        <div class="sub" id="display-location">Lusaka, Zambia 3.5 ha</div>
+        <span class="role-pill" id="role-badge">Farm Owner</span>
+      </div>
+      <div class="sb-weather">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="font-size:1.6rem" id="sbWxIcon">⛅</div>
+          <div>
+            <div class="sb-wx-temp" id="sbTemp">28°C</div>
+            <div class="sb-wx-desc" id="sbDesc">Partly Cloudy</div>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="handleLogout()" style="width:100%; margin-top:12px; border-color:rgba(255,255,255,0.2); color:var(--cream)">🚪 Logout</button>
+    </div>
+    <div class="sidebar-ticker"><span class="ticker-inner">🌽 Maize Growing &nbsp;&nbsp; 🫘 Soya Bean Fertilizing
+        &nbsp;&nbsp; 🥜 Groundnuts Planting &nbsp;&nbsp; 🍠 Sweet Potato Harvesting &nbsp;&nbsp; 🌦️ Rain forecast
+        Thursday &nbsp;&nbsp; 7 workers on duty today</span></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button class="btn btn-ghost btn-sm mobile-only" onclick="toggleSidebar()" style="margin-right:10px">☰</button>
+      <div class="topbar-title">
+        <span class="topbar-sub" id="dash-greeting">Welcome back</span>
+        <span id="page-title">Dashboard Overview</span>
+      </div>
+      <div class="topbar-right">
+        <div class="search-bar-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="search-bar" placeholder="Search crops, workers, tasks..." oninput="handleSearch(this.value)">
+        </div>
+        <div class="currency-toggle" style="display:flex; align-items:center; background:var(--gray-100); padding:4px; border-radius:8px; gap:4px">
+          <button class="btn btn-sm btn-ghost active" id="btn-curr-zmw" onclick="setCurrency('ZMW')" style="padding:4px 8px; border:none">ZMW</button>
+          <button class="btn btn-sm btn-ghost" id="btn-curr-usd" onclick="setCurrency('USD')" style="padding:4px 8px; border:none">USD</button>
+        </div>
+        <span style="font-size:12px;color:var(--gray-500)">Season: 2026/2027</span>
+        <button class="btn btn-ghost btn-sm" onclick="window.showPage('ai')"
+          style="display:flex;align-items:center;gap:5px">🤖 Ask AI Advisor</button>
+        <div class="notif-wrapper">
+          <button class="notif-btn" onclick="toggleNotifPanel()" title="Notifications">
+            🔔<span class="notif-count" id="notif-count">3</span>
+          </button>
+          <div class="notif-panel" id="notif-panel">
+            <div class="notif-header">
+              <span class="notif-title">Notifications</span>
+              <span class="notif-clear" onclick="clearNotifs()">Mark all read</span>
+            </div>
+            <div id="notif-list"></div>
+          </div>
+        </div>
+        <button class="dark-toggle" onclick="toggleDark()" title="Toggle dark mode" id="dark-btn">🌙</button>
+        <button class="btn btn-secondary btn-sm" onclick="handleLogout()" style="display:flex; align-items:center; gap:6px; color:var(--red-600); border-color:var(--red-100)">🚪 Logout</button>
+        <button class="btn btn-primary" id="topbar-btn" onclick="handleTopbarBtn()">+ Add Record</button>
+      </div>
+    </header>
+
+    <!-- DASHBOARD -->
+    <section class="page active dash-page" id="page-dashboard">
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label"><span class="kpi-label-dot" style="--dot:var(--sage)"></span>Active Crops</div>
+          <div class="kpi-val" id="s-crops">0</div>
+          <div class="kpi-sub" id="kpi-crops-sub">Across fields</div>
+          <div class="kpi-bar"><div class="kpi-bar-fill" id="kpi-bar-crops" style="--pct:75%;--bar-from:var(--leaf);--bar-to:var(--sage)"></div></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label"><span class="kpi-label-dot" style="--dot:var(--harvest)"></span>Workers</div>
+          <div class="kpi-val" id="s-workers">0</div>
+          <div class="kpi-sub" id="kpi-workers-sub">On roster</div>
+          <div class="kpi-bar"><div class="kpi-bar-fill" id="kpi-bar-workers" style="--pct:65%;--bar-from:var(--harvest);--bar-to:var(--wheat)"></div></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label"><span class="kpi-label-dot" style="--dot:var(--rust)"></span>Pending Tasks</div>
+          <div class="kpi-val" id="s-tasks">0</div>
+          <div class="kpi-sub" id="kpi-tasks-sub">Due soon</div>
+          <div class="kpi-bar"><div class="kpi-bar-fill" id="kpi-bar-tasks" style="--pct:50%;--bar-from:var(--rust);--bar-to:var(--harvest)"></div></div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label"><span class="kpi-label-dot" style="--dot:var(--sky)"></span>Season Revenue</div>
+          <div class="kpi-val" id="s-revenue">0</div>
+          <div class="kpi-sub" id="kpi-revenue-sub">Harvest income</div>
+          <div class="kpi-bar"><div class="kpi-bar-fill" id="kpi-bar-revenue" style="--pct:60%;--bar-from:var(--sky);--bar-to:rgba(184,212,232,.4)"></div></div>
+        </div>
+      </div>
+
+      <div class="mid-row">
+        <div class="dash-card crop-card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Crop Health Monitor</div>
+              <div class="card-sub" id="crop-list-sub">Live from your farm data</div>
+            </div>
+            <button type="button" class="card-header-action" onclick="showPage('crops')">View all →</button>
+          </div>
+          <div class="crop-list" id="cropList"></div>
+        </div>
+        <div class="dash-card field-map-card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Field Map</div>
+              <div class="card-sub" id="field-map-sub">Plot overview</div>
+            </div>
+            <button type="button" class="card-header-action" onclick="showPage('fields')">Expand →</button>
+          </div>
+          <div class="field-map">
+            <div class="field-map-bg"></div>
+            <svg class="field-svg" viewBox="0 0 340 260" xmlns="http://www.w3.org/2000/svg">
+              <rect x="20" y="20" width="90" height="65" rx="6" fill="rgba(74,124,63,0.45)" stroke="rgba(127,176,105,0.6)" stroke-width="1.5"/>
+              <text x="65" y="57" text-anchor="middle" fill="rgba(245,237,216,0.8)" font-family="DM Sans" font-size="9" font-weight="600">Field A</text>
+              <rect x="122" y="20" width="80" height="65" rx="6" fill="rgba(74,124,63,0.35)" stroke="rgba(127,176,105,0.5)" stroke-width="1.5"/>
+              <text x="162" y="57" text-anchor="middle" fill="rgba(245,237,216,0.8)" font-family="DM Sans" font-size="9" font-weight="600">Field B</text>
+              <rect x="20" y="98" width="140" height="80" rx="6" fill="rgba(74,124,63,0.5)" stroke="rgba(127,176,105,0.7)" stroke-width="1.5"/>
+              <text x="90" y="142" text-anchor="middle" fill="rgba(245,237,216,0.9)" font-family="DM Sans" font-size="9" font-weight="600">Main Plot</text>
+              <rect x="172" y="98" width="68" height="80" rx="6" fill="rgba(196,98,45,0.28)" stroke="rgba(196,98,45,0.55)" stroke-width="1.5"/>
+              <text x="206" y="142" text-anchor="middle" fill="rgba(245,237,216,0.8)" font-family="DM Sans" font-size="9" font-weight="600">Field E</text>
+            </svg>
+          </div>
+          <div class="field-legend">
+            <div class="fl-item"><span class="fl-dot" style="background:rgba(74,124,63,.6)"></span>Healthy</div>
+            <div class="fl-item"><span class="fl-dot" style="background:rgba(232,197,71,.6)"></span>Monitor</div>
+            <div class="fl-item"><span class="fl-dot" style="background:rgba(196,98,45,.6)"></span>Alert</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-row">
+        <div class="dash-card chart-card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Harvest Yield</div>
+              <div class="card-sub">By month (tonnes)</div>
+            </div>
+            <button type="button" class="card-header-action" onclick="showPage('reports')">Reports →</button>
+          </div>
+          <div class="chart-bars" id="chartBars"></div>
+          <div class="chart-legend">
+            <div class="cl-item"><span class="cl-swatch" style="background:var(--harvest)"></span>Harvest (t)</div>
+            <div class="cl-item"><span class="cl-swatch" style="background:var(--sky)"></span>Rainfall (mm)</div>
+          </div>
+        </div>
+        <div class="dash-card rainfall-card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Weekly Rain</div>
+              <div class="card-sub">Lusaka region</div>
+            </div>
+          </div>
+          <div class="rainfall-body">
+            <div class="rainfall-big" id="rainfallTotal">34<span style="font-size:.9rem;color:var(--white-60)">mm</span></div>
+            <div class="rainfall-sub">Estimated weekly total</div>
+            <div class="rainfall-days" id="rainDays"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-row">
+        <div class="dash-card activity-card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Activity Log</div>
+              <div class="card-sub">Recent farm events</div>
+            </div>
+            <button type="button" class="card-header-action" onclick="showPage('reports')">Full log →</button>
+          </div>
+          <div class="activity-list" id="activityList"></div>
+        </div>
+        <div class="dash-card labour-card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Labour Status</div>
+              <div class="card-sub" id="worker-list-sub">Today's workers</div>
+            </div>
+            <button type="button" class="card-header-action" onclick="showPage('workers')">Manage →</button>
+          </div>
+          <div class="worker-list" id="workerList"></div>
+        </div>
+        <div class="dash-card tasks-card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Today's Tasks</div>
+              <div class="card-sub"><span id="taskDone">0</span> of <span id="taskTotal">0</span> complete</div>
+            </div>
+            <button type="button" class="card-header-action" onclick="showPage('tasks')">All tasks →</button>
+          </div>
+          <div class="task-list" id="taskList"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CROP MANAGEMENT -->
+    <section class="page" id="page-crops">
+      <div class="page-hero">
+        <div class="page-hero-bg" style="background-image:url('./assets/images/maize-field.jpg')"></div>
+        <div class="page-hero-overlay"></div>
+        <div class="page-hero-content">
+          <div class="section-title">Crop Management</div>
+          <div class="section-desc">Track crop planting, growth stages and expected harvests.</div>
+        </div>
+        <div class="page-hero-icon">🌱</div>
+      </div>
+      <div class="crop-img-row">
+        <div class="crop-img-card"><img src="./assets/images/maize-field.jpg" alt="Maize">
+          <div class="cic-label">🌽 Maize</div>
+        </div>
+        <div class="crop-img-card"><img src="./assets/images/soya-bean.jpg" alt="Soya">
+          <div class="cic-label">🫘 Soya Bean</div>
+        </div>
+        <div class="crop-img-card"><img src="./assets/images/groundnuts.jpg" alt="Groundnuts">
+          <div class="cic-label">🥜 Groundnuts</div>
+        </div>
+        <div class="crop-img-card"><img src="./assets/images/harvest.jpg" alt="Sweet Potato">
+          <div class="cic-label">🍠 Sweet Potato</div>
+        </div>
+        <div class="crop-img-card"><img src="./assets/images/farm-workers.jpg" alt="Tobacco">
+          <div class="cic-label">🍂 Tobacco</div>
+        </div>
+        <div class="crop-img-card"><img src="./assets/images/hero-farm.jpg" alt="Wheat">
+          <div class="cic-label">🌾 Wheat</div>
+        </div>
+        <div class="crop-img-card"><img src="./assets/images/hero-farm.jpg" alt="Barley">
+          <div class="cic-label">🌾 Barley</div>
+        </div>
+        <div class="crop-img-card"><img src="./assets/images/planting.jpg" alt="Vegetables">
+          <div class="cic-label">🥦 Vegetables</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">All Crops</div><button class="btn btn-primary btn-sm"
+            onclick="openModal('modal-crop')">+ Add Crop</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Crop</th>
+                <th>Field</th>
+                <th>Planted</th>
+                <th>Expected Harvest</th>
+                <th>Stage</th>
+                <th>Seeds (kg)</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="crops-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- FIELDS -->
+    <section class="page" id="page-fields">
+      <div class="page-hero">
+        <div class="page-hero-bg" style="background-image:url('./assets/images/hero-farm.jpg')"></div>
+        <div class="page-hero-overlay"></div>
+        <div class="page-hero-content">
+          <div class="section-title">Fields & Plots</div>
+          <div class="section-desc">Manage your farm plots, sizes and soil types.</div>
+        </div>
+        <div class="page-hero-icon">📐</div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost btn-sm active" id="btn-grid-view" onclick="setView('grid')">Grid View</button>
+        <button class="btn btn-ghost btn-sm" id="btn-gps-view" onclick="setView('gps')">🚩 GPS Landscape</button>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openModal('modal-field')">+ Add Field</button>
+    </div>
+
+    <div id="view-grid" class="view-section active">
+      <div class="plot-grid" id="fields-grid"></div>
+    </div>
+
+    <div id="view-gps" class="view-section">
+      <div class="card gps-landscape-card">
+        <div class="card-header">
+          <div class="card-title">GPS Landscape View</div>
+          <div class="card-sub">Zambia-only satellite mapper, area measurement & crop-fit naming</div>
+        </div>
+        <div class="gps-toolbar" id="gps-toolbar">
+          <button class="btn btn-secondary btn-sm" onclick="startGpsWalking()">🚶‍♂️ Walk Boundary (Live GPS)</button>
+          <button class="btn btn-secondary btn-sm" onclick="startFieldMapping()">Start Manual Mapping</button>
+          <button class="btn btn-secondary btn-sm" onclick="undoFieldPoint()">Undo Point</button>
+          <button class="btn btn-secondary btn-sm" onclick="clearFieldMapping()">Clear</button>
+          <button class="btn btn-primary btn-sm" onclick="applyMappedField()">Use in Add Field</button>
+        </div>
+        <div class="gps-meta" id="gps-meta">Mapper idle. Click "Start Mapping" and place points around field edges.</div>
+        <div class="gps-landscape-container" id="gps-landscape">
+          <div class="gps-placeholder">Initializing GPS Alignment...</div>
+        </div>
+        <div class="gps-suitability-panel" id="gps-suitability">
+          <div class="csp-title">🌱 Crop Suitability Guide</div>
+          <div class="csp-grid">
+            <div class="csp-item"><strong>Tobacco:</strong> Needs Sandy Loam (North Field)</div>
+            <div class="csp-item"><strong>Wheat:</strong> Best in Clay Loam (South Plot)</div>
+            <div class="csp-item"><strong>Cassava:</strong> Very resilient (East Garden)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </section>
+
+    <!-- HARVEST -->
+    <section class="page" id="page-harvest">
+      <div class="page-hero">
+        <div class="page-hero-bg" style="background-image:url('./assets/images/harvest.jpg')"></div>
+        <div class="page-hero-overlay"></div>
+        <div class="page-hero-content">
+          <div class="section-title">Harvest Records</div>
+          <div class="section-desc">Record yields, selling prices and revenues.</div>
+        </div>
+        <div class="page-hero-icon">🌾</div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Harvest Log</div><button class="btn btn-primary btn-sm"
+            onclick="openModal('modal-harvest')">+ Record Harvest</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Crop</th>
+                <th>Date</th>
+                <th>Yield (kg)</th>
+                <th>Price/kg (ZMW)</th>
+                <th>Revenue (ZMW)</th>
+                <th>Field</th>
+              </tr>
+            </thead>
+            <tbody id="harvest-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- INPUTS -->
+    <section class="page" id="page-inputs">
+      <div class="page-hero">
+        <div class="page-hero-bg" style="background-image:url('./assets/images/planting.jpg')"></div>
+        <div class="page-hero-overlay"></div>
+        <div class="page-hero-content">
+          <div class="section-title">Input Tracking</div>
+          <div class="section-desc">Record seeds, fertilizers, pesticides and fuel used per crop.</div>
+        </div>
+        <div class="page-hero-icon">🧪</div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Input Usage Log</div><button class="btn btn-primary btn-sm"
+            onclick="openModal('modal-input')">+ Log Input</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Type</th>
+                <th>Crop</th>
+                <th>Qty</th>
+                <th>Unit</th>
+                <th>Cost (ZMW)</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="inputs-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- WORKERS -->
+    <section class="page" id="page-workers">
+      <div class="page-hero">
+        <div class="page-hero-bg" style="background-image:url('./assets/images/farm-workers.jpg')"></div>
+        <div class="page-hero-overlay"></div>
+        <div class="page-hero-content">
+          <div class="section-title">Labour Management</div>
+          <div class="section-desc">Manage workers, attendance and wage calculations.</div>
+        </div>
+        <div class="page-hero-icon">👥</div>
+      </div>
+
+      <div class="card mb-20">
+        <div class="card-header">
+          <div class="card-title">Advances & Payroll</div>
+          <button class="btn btn-ghost btn-sm" onclick="showModal('modal-advance')">+ Log Advance</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Worker</th><th>Advance</th><th>Wages Due</th><th>Net Pay</th><th>Action</th></tr></thead>
+            <tbody id="payroll-table"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card mb-20">
+        <div class="card-header">
+          <div class="card-title">Worker Directory</div>
+          <div style="display:flex;gap:8px"><button class="btn btn-ghost btn-sm" onclick="showPage('sms')">Y" Send
+              SMS</button><button class="btn btn-primary btn-sm" onclick="window._editingWorkerId=null; openModal('modal-worker')">+ Add
+              Worker</button></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Rate/day</th>
+                <th>Days Worked</th>
+                <th>Total Owed</th>
+                <th data-requires-rank="manager">Access rank</th>
+                <th>Today</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="workers-table"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Attendance Log</div><button class="btn btn-primary btn-sm"
+            onclick="openModal('modal-attendance')">+ Log Attendance</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Worker</th>
+                <th>Date</th>
+                <th>Hours</th>
+                <th>Task</th>
+                <th>Status <span style="font-weight:400;font-size:10px">(tap)</span></th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="attendance-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TASKS -->
+    <section class="page" id="page-tasks">
+      <div class="page-hero">
+        <div class="page-hero-bg" style="background-image:url('./assets/images/hero-farm.jpg')"></div>
+        <div class="page-hero-overlay"></div>
+        <div class="page-hero-content">
+          <div class="section-title">Task Assignment</div>
+          <div class="section-desc">Assign farm activities to workers with deadlines and track completion.</div>
+        </div>
+        <div class="page-hero-icon">✅</div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">All Tasks</div><button class="btn btn-primary btn-sm"
+            onclick="openModal('modal-task')">+ Assign Task</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Task</th>
+                <th>Field</th>
+                <th>Assigned To</th>
+                <th>Due Date</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="tasks-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- WEATHER PAGE -->
+    <section class="page" id="page-weather">
+      <div class="page-hero">
+        <div class="page-hero-bg" style="background-image:url('./assets/images/weather-field.jpg')"></div>
+        <div class="page-hero-overlay"></div>
+        <div class="page-hero-content">
+          <div class="section-title">Weather & Planting Alerts</div>
+          <div class="section-desc">Current conditions for Lusaka plus farming alerts for the week ahead.</div>
+        </div>
+        <div class="page-hero-icon">🌦</div>
+      </div>
+      <div id="weather-alerts" class="alert-strip mb-20"></div>
+      <div class="weather-strip mb-20">
+        <div class="weather-main" id="weather-main-card"></div>
+        <div class="weather-forecast" id="weather-forecast-card"></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Crop-Specific Alerts</div>
+              <div class="card-sub">Based on your current crops</div>
+            </div>
+          </div>
+          <div id="crop-weather-alerts"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">Zambian Planting Calendar</div>
+              <div class="card-sub">Recommended windows for your region</div>
+            </div>
+          </div>
+          <div id="planting-calendar"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- AI ADVISOR PAGE -->
+    <section class="page" id="page-ai">
+      <div class="ai-hero">
+        <div class="ai-hero-content">
+          <div class="ai-avatar-large">🤖</div>
+          <div class="ai-hero-text">
+            <h2>AI Crop Advisor</h2>
+            <p>Powered by Claude AI · Has full access to your farm data, crop stages, weather and labour records for
+              your region.</p>
+            <div class="ai-status-dot"><span class="live-dot"></span> Online · Ready to help</div>
+          </div>
+        </div>
+      </div>
+      <div class="section-desc" style="margin-bottom:16px">Ask any farming question — the advisor knows your crops,
+        workers, costs and field data.</div>
+      <div class="ai-context-bar">
+        <span>Farm context loaded:</span>
+        <span class="ai-context-tag" id="ctx-crops">4 crops</span>
+        <span class="ai-context-tag" id="ctx-workers">7 workers</span>
+        <span class="ai-context-tag" id="ctx-tasks">6 tasks</span>
+        <span class="ai-context-tag" id="ctx-inputs">ZMW 4,380 inputs</span>
+        <span class="ai-context-tag">Lusaka, Zambia</span>
+      </div>
+
+      <!-- AI BACKEND DIAGNOSTICS -->
+      <div class="card ai-diagnostics-card" style="margin-top: 15px; margin-bottom: 20px; background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; padding: 18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="toggleAIDiagnostics()">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:20px;">⚙️</span>
+            <div>
+              <div style="font-weight:600; font-size:15px; color:var(--gray-900);">AI Backend Diagnostics & Settings</div>
+              <div style="font-size:12px; color:var(--gray-500);" id="ai-diag-sub">Auto-checking AI link...</div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span class="badge" id="ai-connection-badge" style="background:var(--gray-200); color:var(--gray-700); font-weight:600; font-size:11px; padding:4px 10px; border-radius:12px;">Checking...</span>
+            <span id="ai-diag-toggle-icon" style="font-size:12px; color:var(--gray-500);">▲</span>
+          </div>
+        </div>
+        
+        <div id="ai-diagnostics-body" style="margin-top:16px; display:block; border-top: 1px solid rgba(0,0,0,0.06); padding-top:16px;">
+          <div class="form-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px; margin-bottom:16px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:12px; color:var(--gray-600); font-weight:500;">Supabase URL</label>
+              <input type="text" class="form-control" id="ai-diag-url" placeholder="https://your-project.supabase.co" style="font-family:monospace; font-size:12.5px;" oninput="updateAIDiagConfig()">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:12px; color:var(--gray-600); font-weight:500;">Supabase Anon Key</label>
+              <input type="password" class="form-control" id="ai-diag-key" placeholder="eyJhbGciOiJIUzI1Ni..." style="font-family:monospace; font-size:12.5px;" oninput="updateAIDiagConfig()">
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+            <div style="font-size:11.5px; color:var(--gray-500);">
+              <strong>Endpoint:</strong> <code id="ai-diag-endpoint-display" style="font-size:11px; background:rgba(0,0,0,0.04); padding:2px 6px; border-radius:4px;">https://your-project.supabase.co/functions/v1/ai-chat</code>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-secondary btn-sm" onclick="saveAIDiagConfig()" style="font-size:12px; padding:6px 12px;">💾 Save Credentials</button>
+              <button class="btn btn-primary btn-sm" id="btn-test-ai" onclick="runAIDiagnostics()" style="font-size:12px; padding:6px 14px; background:var(--green-700); border-color:var(--green-700)">⚡ Test Link</button>
+            </div>
+          </div>
+
+          <div id="ai-diag-console" style="background:#1e1e1e; border-radius:8px; padding:12px; color:#d4d4d4; font-family:Consolas, Monaco, monospace; font-size:12px; line-height:1.5; max-height:220px; overflow-y:auto; margin-bottom:12px; display:none;">
+            <!-- Diagnostic steps will print here -->
+          </div>
+
+          <div id="ai-setup-guide" style="background:#fff3cd; border: 1px solid #ffeeba; color:#856404; border-radius:8px; padding:14px; display:none;">
+            <div style="font-weight:600; font-size:13px; margin-bottom:6px; display:flex; align-items:center; gap:6px;">⚠️ Supabase Edge Function Setup Required</div>
+            <div style="font-size:11.5px; margin-bottom:10px;">The AI chatbot endpoint returned a **404 Not Found**. You need to deploy the `ai-chat` Edge Function to your Supabase project. Run these commands from your local project root:</div>
+            <pre style="background:rgba(0,0,0,0.06); padding:8px 12px; border-radius:4px; font-size:11px; margin:0; overflow-x:auto; font-family:monospace; line-height:1.4; color:#533f03;">npx supabase login
+npx supabase link --project-ref <span class="project-ref-holder">YOUR-REF</span>
+npx supabase secrets set ANTHROPIC_API_KEY=your_anthropic_api_key
+npx supabase functions deploy ai-chat</pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="ai-chat-panel">
+        <div class="quick-prompts" id="quick-prompts"></div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div id="ai-image-preview-container" class="chat-image-preview-wrap" style="display:none">
+          <div class="image-preview-box">
+            <img id="ai-image-preview" src="" alt="Plant preview">
+            <button class="remove-img-btn" onclick="clearAIImage()">×</button>
+          </div>
+        </div>
+        <div class="chat-input-row">
+          <label class="btn-chat-action" title="Upload plant photo">
+            📸
+            <input type="file" id="ai-image-input" accept="image/*" capture="environment" style="display:none" onchange="handleAIImage(this)">
+          </label>
+          <textarea class="chat-input" id="chat-input"
+            placeholder="Ask about your crops, or upload a photo for diagnosis..." rows="1"
+            onkeydown="handleChatKey(event)"></textarea>
+          <button class="btn btn-ai" onclick="sendChat()" id="chat-send-btn">Send</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SMS PAGE -->
+    <section class="page" id="page-sms">
+      <div class="section-title">SMS Notifications</div>
+      <div class="section-desc">Send task reminders, wage summaries and announcements to workers using Africa's Talking.</div>
+
+      <!-- NETWORK BADGES -->
+      <div class="alert-strip mb-20">
+        <div class="alert-pill alert-good"><span>🇿🇲</span> <strong>Zambia Coverage:</strong></div>
+        <div class="badge badge-green" style="background:#e8f5e9; color:#2e7d32">ZAMTEL</div>
+        <div class="badge badge-amber" style="background:#fff9c4; color:#827717">MTN</div>
+        <div class="badge badge-red" style="background:#fce4ec; color:#880e4f">AIRTEL</div>
+      </div>
+
+      <div class="sms-grid">
+        <div class="sms-compose">
+          <div class="card-title mb-20" style="margin-bottom:14px">Compose Message</div>
+          
+          <div class="form-group">
+            <div class="form-label">To (select workers)</div>
+            <div class="recipient-chips" id="recipient-chips" onclick="document.getElementById('worker-select-dd').focus()"></div>
+            <div style="display:flex; gap:8px">
+              <select class="form-control" id="worker-select-dd" onchange="addRecipient(this)" style="flex:1">
+                <option value="">+ Add recipient...</option>
+              </select>
+              <button class="btn btn-ghost btn-sm" onclick="addAllWorkersToSms()">+ Add All Workers</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">Quick Templates</div>
+            <div class="sms-templates" id="sms-templates"></div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">Message</div>
+            <textarea class="form-control" id="sms-body" rows="5" placeholder="Type your message..." oninput="updateSmsStats()"></textarea>
+            <div class="char-bar" style="display:flex; justify-content:space-between; margin-top:5px; font-size:11px">
+              <span id="sms-parts-count">Parts: 1</span>
+              <span id="sms-char-count">0 / 160 characters</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <div class="form-label">Sender ID (e.g. NDOU-FARM)</div>
+            <input type="text" class="form-control" id="sms-sender-id" placeholder="NDOU-FARM" maxlength="11">
+            <div class="field-hint" style="font-size:10px; color:var(--gray-500); margin-top:4px">Approved Sender ID from AT. No spaces.</div>
+          </div>
+
+          <div style="display:flex; gap:10px; margin-top:20px">
+            <button class="btn btn-secondary" onclick="clearSms()" style="flex:1">Clear</button>
+            <button class="btn btn-primary" id="btn-send-sms" onclick="sendSms()" style="flex:2">📱 Send SMS</button>
+          </div>
+        </div>
+
+        <div class="sms-log">
+          <div class="card-header">
+            <div class="card-title">Message History</div>
+            <button class="btn btn-ghost btn-sm" onclick="clearSmsLog()">Clear Log</button>
+          </div>
+          <div id="sms-log-list"></div>
+        </div>
+      </div>
+
+      <!-- SMS SETTINGS -->
+      <div class="card" style="margin-top:20px">
+        <div class="card-header">
+          <div class="card-title">📡 Africa's Talking Settings</div>
+          <span class="badge badge-blue" id="at-status-badge">Disconnected</span>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <input type="text" class="form-control" id="at-username" placeholder="sandbox or your AT username">
+          </div>
+          <div class="form-group">
+            <label class="form-label">API Key</label>
+            <input type="password" class="form-control" id="at-apikey" placeholder="ATxxxxxxxxxxxxxxxxxxxxxxxx">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mode</label>
+            <select class="form-control" id="at-mode">
+              <option value="sandbox">Sandbox (Testing)</option>
+              <option value="live">Live (Real SMS)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-primary" style="width:100%" onclick="saveSmsSettings()">Save & Test Connection</button>
+          </div>
+        </div>
+        <div class="field-hint" style="font-size:11.5px; color:var(--gray-500)">
+          Get your credentials from <a href="https://account.africastalking.com" target="_blank" style="color:var(--green-600)">Africa's Talking Dashboard</a>.
+        </div>
+      </div>
+    </section>
+
+    <!-- REPORTS -->
+    <section class="page" id="page-reports">
+      <div class="page-hero">
+        <div class="page-hero-bg" style="background-image:url('./assets/images/weather-field.jpg')"></div>
+        <div class="page-hero-overlay"></div>
+        <div class="page-hero-content">
+          <div class="section-title">Reports & Analytics</div>
+          <div class="section-desc">Profitability analysis, labour summaries and farm performance.</div>
+        </div>
+        <div class="page-hero-icon">📊</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px;gap:8px">
+        <button class="btn btn-secondary btn-sm" onclick="showPage('export')">📊 Export Report</button>
+      </div>
+      <div class="report-summary" id="report-summary"></div>
+      <div class="grid-2 mb-20">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Profit by Crop (ZMW)</div>
+          </div>
+          <div class="bar-chart" id="report-profit-chart"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Labour Cost by Worker (ZMW)</div>
+          </div>
+          <div class="bar-chart" id="report-labour-chart"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Crop Profitability Breakdown</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Crop</th>
+                <th>Revenue</th>
+                <th>Input Costs</th>
+                <th>Labour Costs</th>
+                <th>Net Profit</th>
+                <th>Margin</th>
+              </tr>
+            </thead>
+            <tbody id="profitability-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- FIELDS PAGE -->
+    <section class="page" id="page-fields">
+      <div class="section-title">Fields & Plots</div>
+      <div class="section-desc">Map your farm and manage soil health per block.</div>
+      <div class="alert-strip mb-20" style="display:flex; align-items:center; gap:12px; background:#fff; border:1px solid var(--border)">
+        <button class="btn btn-secondary btn-sm" onclick="startGpsWalking()">🚶‍♂️ Walk New Boundary (Live GPS)</button>
+        <div id="gps-status" style="font-size:12px; color:var(--gray-600)">GPS Status: Ready</div>
+      </div>
+      <div id="map"></div>
+    </section>
+
+    <!-- EXPORT PAGE -->
+    <section class="page" id="page-export">
+      <div class="section-title">Export Data</div>
+      <div class="section-desc">Download farm reports as CSV or print-ready formats.</div>
+      <div class="export-grid">
+        <div class="export-card" onclick="exportCSV('harvest')">
+          <div class="ex-icon">🌾</div>
+          <div class="ex-title">Harvest Report CSV</div>
+          <div class="ex-desc">All harvest records with yields, prices and revenue. Opens in Excel.</div>
+        </div>
+        <div class="export-card" onclick="exportCSV('inputs')">
+          <div class="ex-icon">🧪</div>
+          <div class="ex-title">Input Costs CSV</div>
+          <div class="ex-desc">All farm inputs with quantities, costs and dates per crop.</div>
+        </div>
+        <div class="export-card" onclick="exportCSV('workers')">
+          <div class="ex-icon">👥</div>
+          <div class="ex-title">Payroll Summary CSV</div>
+          <div class="ex-desc">Worker attendance, days worked and total wages owed.</div>
+        </div>
+        <div class="export-card" onclick="exportCSV('tasks')">
+          <div class="ex-icon">✅</div>
+          <div class="ex-title">Task Log CSV</div>
+          <div class="ex-desc">All tasks with assignees, due dates and completion status.</div>
+        </div>
+        <div class="export-card" onclick="exportCSV('profitability')">
+          <div class="ex-icon">📊</div>
+          <div class="ex-title">Profitability Report CSV</div>
+          <div class="ex-desc">Revenue, costs and net profit per crop for the season.</div>
+        </div>
+        <div class="export-card" onclick="printReport()">
+          <div class="ex-icon">🖨️</div>
+          <div class="ex-title">Print Farm Report</div>
+          <div class="ex-desc">Full season summary formatted for printing or sharing as PDF.</div>
+        </div>
+      </div>
+      <div class="export-preview">
+        <div class="card-header">
+          <div class="card-title">Season Report Preview</div>
+        </div>
+        <div id="export-preview-content"></div>
+      </div>
+    </section>
+
+    <!-- INVENTORY STORE -->
+    <section class="page" id="page-inventory">
+      <div class="section-title">Inventory Store</div>
+      <div class="section-desc">Manage bulk purchases of seeds, fertilizer, and chemicals.</div>
+      
+      <div class="grid-3 mb-20">
+        <div class="stat-card stat-blue">
+          <div class="stat-label">Stock Value</div>
+          <div class="stat-value" id="inv-total-value">K0</div>
+        </div>
+        <div class="stat-card stat-amber">
+          <div class="stat-label">Low Stock Items</div>
+          <div class="stat-value" id="inv-low-count">0</div>
+        </div>
+        <button class="btn btn-primary" onclick="showModal('modal-inventory-add')" style="height:100%">+ Add Bulk Stock</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Current Inventory</div>
+          <div class="search-bar-wrap" style="width:250px">
+            <input class="form-control" placeholder="Search stock..." oninput="filterInventory(this.value)">
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Item</th><th>Type</th><th>In Stock</th><th>Unit</th><th>Avg Cost</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="inventory-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- MARKET & FINANCE -->
+    <section class="page" id="page-market">
+      <div class="page-hero">
+        <div class="page-hero-bg" style="background: var(--amber-700)"></div>
+        <div class="page-hero-overlay"></div>
+        <div class="page-hero-content">
+          <div class="section-title">Market & Financial Intelligence</div>
+          <div class="section-desc">Real-time Zambia market prices and field-level margin analysis.</div>
+        </div>
+        <div class="page-hero-icon">📈</div>
+      </div>
+
+      <div class="grid-2 mb-20">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Live Zambian Market Prices (ZMW)</div>
+            <span class="badge badge-blue">Source: CHID</span>
+          </div>
+          <div class="table-wrap">
+            <table style="font-size: 14px">
+              <thead><tr><th>Commodity</th><th>Lusaka</th><th>Copperbelt</th><th>Southern</th><th>Trend</th></tr></thead>
+              <tbody id="market-prices-table">
+                <tr><td>Maize (50kg)</td><td>K350</td><td>K365</td><td>K340</td><td style="color:var(--green-600)">▲ 2%</td></tr>
+                <tr><td>Soya Beans (50kg)</td><td>K620</td><td>K635</td><td>K610</td><td style="color:var(--red-600)">▼ 1%</td></tr>
+                <tr><td>Groundnuts (50kg)</td><td>K450</td><td>K470</td><td>K440</td><td style="color:var(--gray-500)">— 0%</td></tr>
+                <tr><td>Wheat (Ton)</td><td>K8,200</td><td>K8,400</td><td>K8,100</td><td style="color:var(--green-600)">▲ 5%</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Field Profitability Analysis</div>
+          </div>
+          <div class="health-ring-wrap" id="profit-margin-chart" style="min-height: 250px; height: auto; justify-content: center; padding: 20px 0">
+            <!-- Dynamic Chart -->
+          </div>
+          <div id="profit-summary-list" style="padding: 15px"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TRACEABILITY -->
+    <section class="page" id="page-traceability">
+      <div class="page-hero">
+        <div class="page-hero-bg" style="background: var(--blue-700)"></div>
+        <div class="page-hero-overlay"></div>
+        <div class="page-hero-content">
+          <div class="section-title">Supply Chain & Traceability</div>
+          <div class="section-desc">Generate export-ready QR codes and compliance reports.</div>
+        </div>
+        <div class="page-hero-icon">🔗</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Export Batches</div>
+          <button class="btn btn-primary btn-sm" onclick="showModal('modal-batch-add')">+ Create Export Batch</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Batch ID</th><th>Commodity</th><th>Field Origin</th><th>Weight</th><th>QR Code</th><th>Status</th></tr></thead>
+            <tbody id="trace-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="page" id="page-settings">
+      <div class="page-hero">
+        <div class="page-hero-bg" style="background: var(--green-800)"></div>
+        <div class="page-hero-overlay"></div>
+        <div class="page-hero-content">
+          <div class="section-title">System Settings</div>
+          <div class="section-desc">Configure your cloud connection and SMS API keys.</div>
+        </div>
+        <div class="page-hero-icon">⚙️</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Supabase Connection</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Supabase URL</label>
+            <input type="text" class="form-control" id="set-supa-url" placeholder="https://your-project.supabase.co">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Supabase Anon Key</label>
+            <input type="password" class="form-control" id="set-supa-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+          </div>
+          <button class="btn btn-primary" onclick="saveSystemSettings()">Save Connection</button>
+        </div>
+
+        <div class="card" id="team-access-card">
+          <div class="card-header">
+            <div class="card-title">Team access ranks</div>
+          </div>
+          <p style="font-size: 13px; color: var(--gray-600); margin-bottom: 14px;">
+            Assign <strong>Manager</strong>, <strong>Supervisor</strong>, or <strong>Foreman</strong> on each worker (Workers page).
+            Each rank sees only the menus they need.
+          </p>
+          <div class="form-group" data-requires-rank="owner">
+            <label class="form-label">Preview as role (demo / testing)</label>
+            <select class="form-control" id="demo-role-select" onchange="setDemoRole(this.value)">
+              <option value="owner">Farm Owner — full access</option>
+              <option value="manager">Manager</option>
+              <option value="supervisor">Supervisor</option>
+              <option value="foreman">Foreman</option>
+              <option value="worker">Field Worker</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Africa's Talking SMS</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Sender ID</label>
+            <input type="text" class="form-control" id="set-sms-sender" placeholder="FARM">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Language</label>
+            <select class="form-control" id="set-lang" onchange="setLang(this.value)">
+              <option value="en">English</option>
+              <option value="ny">Nyanja / Chewa</option>
+            </select>
+          </div>
+          <p style="font-size: 11px; color: var(--gray-500); margin-top: 10px;">
+            Note: SMS Username and API Key should be set as Supabase Secrets for security.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ADMIN PANEL -->
+    <section class="page" id="page-admin">
+      <div class="page-hero">
+        <div class="page-hero-bg" style="background: var(--blue-800)"></div>
+        <div class="page-hero-overlay"></div>
+        <div class="page-hero-content">
+          <div class="section-title">System Administration</div>
+          <div class="section-desc">Manage farmers, view system-wide stats, and control global settings.</div>
+        </div>
+        <div class="page-hero-icon">🛡️</div>
+      </div>
+
+      <div class="stats-grid mb-20">
+        <div class="stat-card stat-blue">
+          <div class="stat-label">Total Farmers</div>
+          <div class="stat-value" id="admin-total-farmers">0</div>
+          <div class="stat-meta">Registered on platform</div>
+        </div>
+        <div class="stat-card stat-green">
+          <div class="stat-label">Total Crops</div>
+          <div class="stat-value" id="admin-total-crops">0</div>
+          <div class="stat-meta">Active across all farms</div>
+        </div>
+        <div class="stat-card stat-amber">
+          <div class="stat-label">Total Workers</div>
+          <div class="stat-value" id="admin-total-workers">0</div>
+          <div class="stat-meta">Managed via platform</div>
+        </div>
+        <div class="stat-card stat-earth">
+          <div class="stat-label">Total Revenue</div>
+          <div class="stat-value" id="admin-total-revenue">ZMW 0</div>
+          <div class="stat-meta">Tracked globally</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Farmer Management</div>
+          <div class="card-sub">Manage user roles and view farm profiles</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Farmer / Email</th>
+                <th>Farm Name</th>
+                <th>Location</th>
+                <th>Size (ha)</th>
+                <th>Role</th>
+                <th>Joined</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="admin-farmers-table">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABOUT & CONTACT -->
+    <section class="page" id="page-about">
+      <div class="page-hero">
+        <div class="page-hero-bg" style="background: var(--green-900)"></div>
+        <div class="page-hero-overlay"></div>
+        <div class="page-hero-content">
+          <div class="section-title">About FarmTrack</div>
+          <div class="section-desc">Learn about the system and get in touch with administration.</div>
+        </div>
+        <div class="page-hero-icon">ℹ️</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Administrator Contact</div>
+          </div>
+          <div class="card-body">
+            <div style="display:flex; flex-direction:column; gap:16px; padding:10px 0">
+              <div style="display:flex; align-items:center; gap:12px">
+                <div class="avatar avatar-green">RN</div>
+                <div>
+                  <div style="font-weight:600; font-size:16px">Richard Ndou</div>
+                  <div style="font-size:13px; color:var(--gray-500)">System Administrator</div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px">
+                <span style="font-size:20px">📞</span>
+                <a href="tel:+260970373084" style="color:var(--green-700); text-decoration:none; font-weight:500">+260 970 373 084</a>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px">
+                <span style="font-size:20px">✉️</span>
+                <a href="mailto:richardndou1578@gmail.com" style="color:var(--green-700); text-decoration:none; font-weight:500">richardndou1578@gmail.com</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">App Information</div>
+          </div>
+          <div class="card-body">
+            <p style="font-size:14px; line-height:1.6; color:var(--gray-700)">
+              <strong>FarmTrack Zambia</strong> is a specialized crop and labour management system designed to empower farmers with data-driven insights. From GPS field mapping to AI-powered crop advice, we provide the tools needed for modern agriculture.
+            </p>
+            <div style="margin-top:16px; font-size:13px; color:var(--gray-500)">
+              Version: 1.2.0 (Stable)<br>
+              Release: Zambia 2026/2027 Season
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:20px">
+        <div class="card-header">
+          <div class="card-title">Policies & Legal</div>
+        </div>
+        <div class="card-body">
+          <div class="grid-2" style="gap:30px">
+            <div>
+              <h4 style="color:var(--green-800); margin-bottom:10px">Privacy Policy</h4>
+              <p style="font-size:12.5px; line-height:1.5; color:var(--gray-600)">
+                We value your farm's data privacy. Your data is stored securely in encrypted cloud databases. We do not share individual farm performance data with third parties. Usage analytics are used solely to improve system performance.
+              </p>
+            </div>
+            <div>
+              <h4 style="color:var(--green-800); margin-bottom:10px">Terms of Service</h4>
+              <p style="font-size:12.5px; line-height:1.5; color:var(--gray-600)">
+                By using FarmTrack, you agree to provide accurate records for system integrity. AI advice is for guidance only; final agricultural decisions should be verified by a qualified agronomist in your specific district.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+
+  <!-- MODALS -->
+  <div class="modal-overlay" id="modal-crop">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Add Crop</div><button class="close-btn" onclick="closeModal('modal-crop')">-</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Crop Name</label><input class="form-control" id="c-name"
+              placeholder="e.g. Tobacco, Wheat, Cassava, Apples..."></div>
+          <div class="form-group"><label class="form-label">Field / Plot</label><select class="form-control"
+              id="c-field"></select></div>
+          <div class="form-group"><label class="form-label">Date Planted</label><input type="date" class="form-control"
+              id="c-planted"></div>
+          <div class="form-group"><label class="form-label">Expected Harvest</label><input type="date"
+              class="form-control" id="c-harvest"></div>
+          <div class="form-group"><label class="form-label">Growth Stage</label><select class="form-control"
+              id="c-stage">
+              <option>Land Preparation</option>
+              <option>Planting</option>
+              <option>Fertilizing</option>
+              <option>Spraying</option>
+              <option>Growing</option>
+              <option>Harvesting</option>
+            </select></div>
+          <div class="form-group"><label class="form-label">Seeds Used (kg)</label><input type="number"
+              class="form-control" id="c-seeds" placeholder="0"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Notes</label><textarea class="form-control" id="c-notes"
+            rows="2"></textarea></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary"
+          onclick="closeModal('modal-crop')">Cancel</button><button class="btn btn-primary" onclick="saveCrop()">Save
+          Crop</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-field">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Add Field / Plot</div><button class="close-btn"
+          onclick="closeModal('modal-field')">-</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Plot Name</label><input class="form-control" id="f-name"
+              placeholder="e.g. North Field A"></div>
+          <div class="form-group"><label class="form-label">Size (hectares)</label><input type="number" step="0.1"
+              class="form-control" id="f-size" placeholder="0.0"></div>
+          <div class="form-group"><label class="form-label">Soil Type</label><select class="form-control" id="f-soil">
+              <option>Sandy Loam</option>
+              <option>Clay Loam</option>
+              <option>Sandy</option>
+              <option>Red Clay</option>
+              <option>Loamy Sand</option>
+            </select></div>
+          <div class="form-group"><label class="form-label">Location</label><input class="form-control" id="f-loc"
+              placeholder="e.g. Northern Block"></div>
+          <div class="form-group"><label class="form-label">Latitude (GPS)</label><input type="number" step="0.000001" class="form-control" id="f-lat" placeholder="-15.385000"></div>
+          <div class="form-group"><label class="form-label">Longitude (GPS)</label><input type="number" step="0.000001" class="form-control" id="f-lng" placeholder="28.324000"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Notes</label><textarea class="form-control" id="f-notes"
+            rows="2"></textarea></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary"
+          onclick="closeModal('modal-field')">Cancel</button><button class="btn btn-primary" onclick="saveField()">Save
+          Field</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-harvest">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Record Harvest</div><button class="close-btn"
+          onclick="closeModal('modal-harvest')">-</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Crop</label><select class="form-control"
+              id="h-crop"></select></div>
+          <div class="form-group"><label class="form-label">Field</label><select class="form-control"
+              id="h-field"></select></div>
+          <div class="form-group"><label class="form-label">Harvest Date</label><input type="date" class="form-control"
+              id="h-date"></div>
+          <div class="form-group"><label class="form-label">Yield (kg)</label><input type="number" class="form-control"
+              id="h-yield" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">Selling Price</label><input type="number"
+              class="form-control" id="h-price" placeholder="0.00"></div>
+          <div class="form-group"><label class="form-label">Buyer / Market</label><input class="form-control"
+              id="h-buyer" placeholder="e.g. Local Market"></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary"
+          onclick="closeModal('modal-harvest')">Cancel</button><button class="btn btn-primary"
+          onclick="saveHarvest()">Save Record</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-input">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Log Farm Input</div><button class="close-btn"
+          onclick="closeModal('modal-input')">-</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Item Name</label><input class="form-control" id="i-name"
+              placeholder="e.g. Urea Fertilizer"></div>
+          <div class="form-group"><label class="form-label">Type</label><select class="form-control" id="i-type">
+              <option>Fertilizer</option>
+              <option>Seed</option>
+              <option>Pesticide</option>
+              <option>Herbicide</option>
+              <option>Fuel</option>
+              <option>Other</option>
+            </select></div>
+          <div class="form-group"><label class="form-label">Crop</label><select class="form-control"
+              id="i-crop"></select></div>
+          <div class="form-group"><label class="form-label">Quantity</label><input type="number" class="form-control"
+              id="i-qty" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">Unit</label><select class="form-control" id="i-unit">
+              <option>kg</option>
+              <option>litres</option>
+              <option>bags</option>
+              <option>units</option>
+            </select></div>
+          <div class="form-group"><label class="form-label">Total Cost</label><input type="number"
+              class="form-control" id="i-cost" placeholder="0.00"></div>
+          <div class="form-group"><label class="form-label">Date Applied</label><input type="date" class="form-control"
+              id="i-date"></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary"
+          onclick="closeModal('modal-input')">Cancel</button><button class="btn btn-primary" onclick="saveInput()">Save
+          Input</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-worker">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Add Worker</div><button class="close-btn"
+          onclick="closeModal('modal-worker')">-</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Full Name</label><input class="form-control" id="w-name"
+              placeholder="Worker name"></div>
+          <div class="form-group"><label class="form-label">Role</label><select class="form-control" id="w-role">
+              <option>General Labour</option>
+              <option>Supervisor</option>
+              <option>Tractor Operator</option>
+              <option>Spray Technician</option>
+              <option>Irrigation Worker</option>
+            </select></div>
+          <div class="form-group"><label class="form-label">Daily Rate</label><input type="number"
+              class="form-control" id="w-rate" placeholder="0.00"></div>
+          <div class="form-group"><label class="form-label">Phone</label><input class="form-control" id="w-phone"
+              placeholder="+260..."></div>
+          <div class="form-group"><label class="form-label">Start Date</label><input type="date" class="form-control"
+              id="w-start"></div>
+          <div class="form-group" data-requires-rank="manager"><label class="form-label">App access rank</label>
+            <select class="form-control" id="w-access-role">
+              <option value="worker">Field Worker — tasks only</option>
+              <option value="foreman">Foreman — workers &amp; tasks</option>
+              <option value="supervisor">Supervisor — crops, fields, labour</option>
+              <option value="manager">Manager — full farm (no billing export)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary"
+          onclick="closeModal('modal-worker'); window._editingWorkerId=null;">Cancel</button><button class="btn btn-primary"
+          onclick="saveWorker()">Save Worker</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-attendance">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Log Attendance</div><button class="close-btn"
+          onclick="closeModal('modal-attendance')">-</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Worker</label><select class="form-control"
+              id="a-worker"></select></div>
+          <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-control"
+              id="a-date"></div>
+          <div class="form-group"><label class="form-label">Hours Worked</label><input type="number"
+              class="form-control" id="a-hours" placeholder="8" min="0" max="24"></div>
+          <div class="form-group"><label class="form-label">Task Performed</label><input class="form-control"
+              id="a-task" placeholder="e.g. Weeding Field A"></div>
+          <div class="form-group"><label class="form-label">Status</label><select class="form-control" id="a-status">
+              <option>Present</option>
+              <option>Half Day</option>
+              <option>Absent</option>
+            </select></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary"
+          onclick="closeModal('modal-attendance')">Cancel</button><button class="btn btn-primary"
+          onclick="saveAttendance()">Save</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-task">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Assign Task</div><button class="close-btn"
+          onclick="closeModal('modal-task')">-</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Task Name</label><input class="form-control" id="t-name"
+              placeholder="e.g. Weed Field B"></div>
+          <div class="form-group"><label class="form-label">Field</label><select class="form-control"
+              id="t-field"></select></div>
+          <div class="form-group"><label class="form-label">Assign To</label><select class="form-control"
+              id="t-worker"></select></div>
+          <div class="form-group"><label class="form-label">Due Date</label><input type="date" class="form-control"
+              id="t-due"></div>
+          <div class="form-group"><label class="form-label">Priority</label><select class="form-control"
+              id="t-priority">
+              <option>High</option>
+              <option>Medium</option>
+              <option>Low</option>
+            </select></div>
+          <div class="form-group"><label class="form-label">Status</label><select class="form-control" id="t-status">
+              <option>Pending</option>
+              <option>In Progress</option>
+              <option>Completed</option>
+            </select></div>
+        </div>
+        <div class="form-group"><label class="form-label">Description</label><textarea class="form-control" id="t-desc"
+            rows="2"></textarea></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary"
+          onclick="closeModal('modal-task')">Cancel</button><button class="btn btn-primary" onclick="saveTask()">Assign
+          Task</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-inventory-add">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Add Bulk Stock</div><button class="close-btn" onclick="closeModal('modal-inventory-add')">-</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Item Name</label><input class="form-control" id="inv-name" placeholder="e.g. D-Compound"></div>
+          <div class="form-group"><label class="form-label">Category</label><select class="form-control" id="inv-type">
+            <option>Fertilizer</option><option>Seed</option><option>Pesticide</option><option>Herbicide</option><option>Fuel</option><option>Other</option>
+          </select></div>
+          <div class="form-group"><label class="form-label">Quantity</label><input type="number" class="form-control" id="inv-qty" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">Unit</label><input class="form-control" id="inv-unit" placeholder="bags / kg / litres"></div>
+          <div class="form-group"><label class="form-label">Total Cost</label><input type="number" class="form-control" id="inv-cost" placeholder="0.00"></div>
+        </div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-inventory-add')">Cancel</button><button class="btn btn-primary" onclick="saveInventoryItem()">Add Stock</button></div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="modal-advance">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title">Log Worker Advance</div><button class="close-btn" onclick="closeModal('modal-advance')">-</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">Worker</label><select class="form-control" id="adv-worker"></select></div>
+          <div class="form-group"><label class="form-label">Amount</label><input type="number" class="form-control" id="adv-amount" placeholder="0.00"></div>
+          <div class="form-group"><label class="form-label">Date</label><input type="date" class="form-control" id="adv-date"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Reason</label><input class="form-control" id="adv-reason" placeholder="e.g. Emergency medical"></div>
+      </div>
+      <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-advance')">Cancel</button><button class="btn btn-primary" onclick="saveAdvance()">Save Advance</button></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- FLOATING GLASS DOCK -->
+  <footer class="mobile-dock">
+    <button class="dock-btn active" onclick="showPage('dashboard')"><span class="dock-icon house-icon">🏡</span>Dashboard</button>
+    <button class="dock-btn" onclick="showPage('crops')"><span class="dock-icon plant-icon">🌱</span>Crops</button>
+    <button class="dock-btn" onclick="showPage('fields')"><span class="dock-icon field-icon">📐</span>Fields</button>
+    <button class="dock-btn" onclick="showPage('workers')"><span class="dock-icon worker-icon">👥</span>Workers</button>
+    <button class="dock-btn" onclick="showPage('ai')"><span class="dock-icon ai-icon">🤖</span>Advisor</button>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./assets/js/supabase_db.js"></script>
+  <script src="./assets/js/roles.js"></script>
+  <script src="./assets/js/landing.js"></script>
+  <script src="./assets/js/farmtrack.js"></script>
+  <script src="./assets/js/inline-edit.js"></script>
+</body>
+
+</html>
